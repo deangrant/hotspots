@@ -13,7 +13,7 @@ mod revisions;
 mod soc;
 mod summary;
 mod table;
-mod util;
+pub(crate) mod util;
 
 use crate::error::{Error, Result};
 use crate::model::Change;
@@ -22,32 +22,49 @@ use crate::options::Options;
 #[doc(inline)]
 pub use table::Table;
 
+type InfallibleAnalysis = fn(&[Change], &Options) -> Table;
+type FallibleAnalysis = fn(&[Change], &Options) -> Result<Table>;
+
+const INFALLIBLE: &[(&str, InfallibleAnalysis)] = &[
+    ("summary", summary::run),
+    ("authors", authors::run),
+    ("revisions", revisions::run),
+    ("hotspots", hotspots::run),
+    ("coupling", coupling::run),
+    ("soc", soc::run),
+    ("entity-effort", effort::entity_effort),
+    ("main-dev-by-revs", effort::main_dev_by_revs),
+    ("fragmentation", effort::fragmentation),
+    ("communication", communication::run),
+    ("identity", identity::run),
+];
+
+const FALLIBLE: &[(&str, FallibleAnalysis)] = &[
+    ("abs-churn", churn::abs_churn),
+    ("author-churn", churn::author_churn),
+    ("entity-churn", churn::entity_churn),
+    ("entity-ownership", ownership::entity_ownership),
+    ("main-dev", ownership::main_dev),
+    ("age", age::run),
+];
+
 /// Runs the named analysis against `changes`.
 ///
 /// # Errors
 ///
 /// Returns an error when the analysis name is unknown or prerequisites fail.
 pub fn run(name: &str, changes: &[Change], opts: &Options) -> Result<Table> {
-    match name {
-        "summary" => Ok(summary::run(changes, opts)),
-        "authors" => Ok(authors::run(changes, opts)),
-        "revisions" => Ok(revisions::run(changes, opts)),
-        "hotspots" => Ok(hotspots::run(changes, opts)),
-        "coupling" => Ok(coupling::run(changes, opts)),
-        "soc" => Ok(soc::run(changes, opts)),
-        "abs-churn" => churn::abs_churn(changes, opts),
-        "author-churn" => churn::author_churn(changes, opts),
-        "entity-churn" => churn::entity_churn(changes, opts),
-        "entity-ownership" => ownership::entity_ownership(changes, opts),
-        "entity-effort" => Ok(effort::entity_effort(changes, opts)),
-        "main-dev" => ownership::main_dev(changes, opts),
-        "main-dev-by-revs" => Ok(effort::main_dev_by_revs(changes, opts)),
-        "fragmentation" => Ok(effort::fragmentation(changes, opts)),
-        "communication" => Ok(communication::run(changes, opts)),
-        "age" => age::run(changes, opts),
-        "identity" => Ok(identity::run(changes, opts)),
-        other => Err(Error::msg(format!("unknown analysis `{other}`"))),
+    if let Some(analysis) = lookup(INFALLIBLE, name) {
+        return Ok(analysis(changes, opts));
     }
+    if let Some(analysis) = lookup(FALLIBLE, name) {
+        return analysis(changes, opts);
+    }
+    Err(Error::msg(format!("unknown analysis `{name}`")))
+}
+
+fn lookup<T: Copy>(table: &[(&str, T)], name: &str) -> Option<T> {
+    table.iter().find(|(key, _)| *key == name).map(|(_, f)| *f)
 }
 
 /// Names of analyses accepted by [`run`].

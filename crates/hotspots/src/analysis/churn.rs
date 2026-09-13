@@ -8,6 +8,8 @@ use crate::error::Result;
 use crate::model::Change;
 use crate::options::Options;
 
+type EntityTotals = BTreeMap<String, (u64, u64, BTreeSet<String>)>;
+
 /// Totals added and deleted lines per calendar date.
 pub fn abs_churn(changes: &[Change], opts: &Options) -> Result<Table> {
     require_churn(changes)?;
@@ -48,27 +50,50 @@ pub fn author_churn(changes: &[Change], opts: &Options) -> Result<Table> {
 /// Totals churn and revisions by entity.
 pub fn entity_churn(changes: &[Change], opts: &Options) -> Result<Table> {
     require_churn(changes)?;
-    let mut totals: BTreeMap<String, (u64, u64, BTreeSet<String>)> = BTreeMap::new();
+    let totals = collect_entity_totals(changes);
+    let mut rows = filter_entity_rows(totals, opts);
+    rows.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2)).then(a.0.cmp(&b.0)));
+    Ok(build_entity_table(rows, opts.rows))
+}
+
+fn collect_entity_totals(changes: &[Change]) -> EntityTotals {
+    let mut totals: EntityTotals = BTreeMap::new();
     for change in changes {
         let entry = totals.entry(change.entity.clone()).or_insert_with(|| (0, 0, BTreeSet::new()));
         entry.0 += change.added.unwrap_or(0);
         entry.1 += change.deleted.unwrap_or(0);
         entry.2.insert(change.rev.clone());
     }
-    let mut rows: Vec<(String, u64, u64, u64)> = totals
+    totals
+}
+
+fn filter_entity_rows(totals: EntityTotals, opts: &Options) -> Vec<(String, u64, u64, u64)> {
+    totals
         .into_iter()
         .filter_map(|(entity, (added, deleted, revs))| {
-            let n_revs = count_as_u64(revs.len());
-            if !meets_min_revs(n_revs, opts) {
-                return None;
-            }
-            Some((entity, added, deleted, n_revs))
+            entity_row(entity, added, deleted, &revs, opts)
         })
-        .collect();
-    rows.sort_by(|a, b| (b.1 + b.2).cmp(&(a.1 + a.2)).then(a.0.cmp(&b.0)));
+        .collect()
+}
+
+fn entity_row(
+    entity: String,
+    added: u64,
+    deleted: u64,
+    revs: &BTreeSet<String>,
+    opts: &Options,
+) -> Option<(String, u64, u64, u64)> {
+    let n_revs = count_as_u64(revs.len());
+    if !meets_min_revs(n_revs, opts) {
+        return None;
+    }
+    Some((entity, added, deleted, n_revs))
+}
+
+fn build_entity_table(rows: Vec<(String, u64, u64, u64)>, limit: Option<usize>) -> Table {
     let mut table = Table::with_headers(["entity", "added", "deleted", "n-revs"]);
     for (entity, added, deleted, n_revs) in rows {
         table.push_row([entity, fmt_u64(added), fmt_u64(deleted), fmt_u64(n_revs)]);
     }
-    Ok(table.limit(opts.rows))
+    table.limit(limit)
 }

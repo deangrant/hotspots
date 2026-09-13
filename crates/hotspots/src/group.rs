@@ -21,14 +21,7 @@ impl LayerMap {
     /// Returns an error when the file cannot be read or a line is malformed.
     pub fn load(path: &Path) -> Result<Self> {
         let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        let mut rules = Vec::new();
-        for line in reader.lines() {
-            let line = line?;
-            if let Some(rule) = parse_rule(&line)? {
-                rules.push(rule);
-            }
-        }
+        let rules = read_rules(BufReader::new(file))?;
         Ok(Self { rules })
     }
 
@@ -57,11 +50,34 @@ impl LayerMap {
     }
 }
 
+fn read_rules(reader: impl BufRead) -> Result<Vec<(String, String)>> {
+    let mut rules = Vec::new();
+    for line in reader.lines() {
+        push_parsed_rule(&mut rules, &line?)?;
+    }
+    Ok(rules)
+}
+
+fn push_parsed_rule(rules: &mut Vec<(String, String)>, line: &str) -> Result<()> {
+    if let Some(rule) = parse_rule(line)? {
+        rules.push(rule);
+    }
+    Ok(())
+}
+
 fn parse_rule(line: &str) -> Result<Option<(String, String)>> {
     let trimmed = line.trim();
-    if trimmed.is_empty() || trimmed.starts_with('#') {
+    if is_skippable(trimmed) {
         return Ok(None);
     }
+    split_rule(trimmed, line)
+}
+
+fn is_skippable(trimmed: &str) -> bool {
+    trimmed.is_empty() || trimmed.starts_with('#')
+}
+
+fn split_rule(trimmed: &str, line: &str) -> Result<Option<(String, String)>> {
     let Some((prefix, layer)) = trimmed.split_once("=>") else {
         return Err(Error::msg(format!(
             "group rule must look like `prefix => layer`: {line}"
@@ -69,10 +85,15 @@ fn parse_rule(line: &str) -> Result<Option<(String, String)>> {
     };
     let prefix = prefix.trim().trim_end_matches('/').to_owned();
     let layer = layer.trim().to_owned();
+    ensure_nonempty_rule(&prefix, &layer, line)?;
+    Ok(Some((prefix, layer)))
+}
+
+fn ensure_nonempty_rule(prefix: &str, layer: &str, line: &str) -> Result<()> {
     if prefix.is_empty() || layer.is_empty() {
         return Err(Error::msg(format!("empty group rule: {line}")));
     }
-    Ok(Some((prefix, layer)))
+    Ok(())
 }
 
 fn matches_prefix(path: &str, prefix: &str) -> bool {
@@ -82,6 +103,7 @@ fn matches_prefix(path: &str, prefix: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn maps_paths_to_layers() {
@@ -95,5 +117,60 @@ mod tests {
             Some(0),
         )]);
         assert_eq!(changes[0].entity, "app");
+    }
+
+    #[test]
+    fn load_accepts_comments_and_blank_lines() {
+        let path = temp_rules("# comment\n\nsrc/ => app\n");
+        let loaded = LayerMap::load(&path);
+        assert!(loaded.is_ok(), "{:?}", loaded.err());
+        let map = loaded.unwrap_or_default();
+        let changes = map.apply(vec![Change::new(
+            "1",
+            "Ada",
+            "2024-01-01",
+            "src/x.rs",
+            None,
+            None,
+        )]);
+        assert_eq!(changes[0].entity, "app");
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn load_rejects_bad_and_empty_rules() {
+        let bad = temp_rules("not-a-rule\n");
+        assert!(LayerMap::load(&bad).is_err());
+        let _ = std::fs::remove_file(bad);
+        let empty = temp_rules(" => \n");
+        assert!(LayerMap::load(&empty).is_err());
+        let _ = std::fs::remove_file(empty);
+        let empty_layer = temp_rules("src =>\n");
+        assert!(LayerMap::load(&empty_layer).is_err());
+        let _ = std::fs::remove_file(empty_layer);
+    }
+
+    #[test]
+    fn unmatched_paths_stay_unchanged() {
+        let map = LayerMap::from_rules(vec![(String::from("src"), String::from("app"))]);
+        let changes = map.apply(vec![Change::new(
+            "1",
+            "Ada",
+            "2024-01-01",
+            "docs/a.md",
+            None,
+            None,
+        )]);
+        assert_eq!(changes[0].entity, "docs/a.md");
+    }
+
+    fn temp_rules(contents: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "hotspots-group-{}-{}.txt",
+            std::process::id(),
+            contents.len()
+        ));
+        let _ = std::fs::write(&path, contents);
+        path
     }
 }

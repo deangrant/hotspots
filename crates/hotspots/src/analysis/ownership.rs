@@ -30,15 +30,10 @@ pub fn main_dev(changes: &[Change], opts: &Options) -> Result<Table> {
     let mut rows = Vec::new();
     for (entity, authors) in map {
         let total_added: u64 = authors.values().map(|(a, _)| *a).sum();
-        let Some((author, added, _)) = authors
-            .into_iter()
-            .map(|(author, (added, deleted))| (author, added, deleted))
-            .max_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(&b.0)))
-        else {
-            continue;
-        };
-        let ownership = percent(added, total_added);
-        rows.push((entity, author, added, ownership));
+        if let Some((author, added)) = leading_author_by_added(authors) {
+            let ownership = percent(added, total_added);
+            rows.push((entity, author, added, ownership));
+        }
     }
     rows.sort_by(|a, b| a.0.cmp(&b.0));
     let mut table = Table::with_headers(["entity", "main-dev", "added", "ownership"]);
@@ -62,6 +57,13 @@ fn collect_churn(changes: &[Change]) -> EntityAuthorChurn {
     map
 }
 
+fn leading_author_by_added(authors: BTreeMap<String, (u64, u64)>) -> Option<(String, u64)> {
+    authors
+        .into_iter()
+        .map(|(author, (added, _))| (author, added))
+        .max_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(&b.0)))
+}
+
 fn flatten_churn(map: EntityAuthorChurn) -> Vec<(String, String, u64, u64)> {
     let mut rows = Vec::new();
     for (entity, authors) in map {
@@ -70,4 +72,22 @@ fn flatten_churn(map: EntityAuthorChurn) -> Vec<(String, String, u64, u64)> {
         }
     }
     rows
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn leading_author_empty_and_tie_break() {
+        assert!(leading_author_by_added(BTreeMap::new()).is_none());
+        let mut authors = BTreeMap::new();
+        authors.insert(String::from("Bea"), (5, 0));
+        authors.insert(String::from("Ada"), (5, 1));
+        // Equal added counts: lexicographically larger author wins.
+        assert_eq!(
+            leading_author_by_added(authors),
+            Some((String::from("Bea"), 5))
+        );
+    }
 }

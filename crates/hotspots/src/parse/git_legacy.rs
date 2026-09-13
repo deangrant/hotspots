@@ -17,6 +17,13 @@ impl VcsParser for GitLegacyParser {
 }
 
 fn parse_header(line: &str) -> Result<Option<(String, String, String)>> {
+    let Some((rev, rest)) = split_legacy_prefix(line)? else {
+        return Ok(None);
+    };
+    parse_legacy_body(rev, rest, line)
+}
+
+fn split_legacy_prefix(line: &str) -> Result<Option<(&str, &str)>> {
     if !line.starts_with('[') {
         return Ok(None);
     }
@@ -27,7 +34,14 @@ fn parse_header(line: &str) -> Result<Option<(String, String, String)>> {
     if rev.is_empty() {
         return Err(Error::msg(format!("legacy header missing rev: {line}")));
     }
-    let rest = line[close + 1..].trim_start();
+    Ok(Some((rev, line[close + 1..].trim_start())))
+}
+
+fn parse_legacy_body(
+    rev: &str,
+    rest: &str,
+    line: &str,
+) -> Result<Option<(String, String, String)>> {
     let date_at = find_iso_date(rest)
         .ok_or_else(|| Error::msg(format!("legacy header missing date: {line}")))?;
     let author = rest[..date_at].trim();
@@ -49,18 +63,31 @@ fn find_iso_date(text: &str) -> Option<usize> {
 
 fn is_iso_date_at(bytes: &[u8], start: usize) -> bool {
     let slice = &bytes[start..start + 10];
-    slice[4] == b'-'
-        && slice[7] == b'-'
-        && slice[0..4].iter().all(u8::is_ascii_digit)
-        && slice[5..7].iter().all(u8::is_ascii_digit)
-        && slice[8..10].iter().all(u8::is_ascii_digit)
+    has_date_separators(slice) && has_numeric_date_parts(slice)
+}
+
+fn has_date_separators(slice: &[u8]) -> bool {
+    slice[4] == b'-' && slice[7] == b'-'
+}
+
+fn has_numeric_date_parts(slice: &[u8]) -> bool {
+    digits(slice, 0, 4) && digits(slice, 5, 7) && digits(slice, 8, 10)
+}
+
+fn digits(slice: &[u8], from: usize, to: usize) -> bool {
+    slice[from..to].iter().all(u8::is_ascii_digit)
 }
 
 fn is_date_token(text: &str, start: usize) -> bool {
-    let before_ok = start == 0 || text.as_bytes()[start - 1].is_ascii_whitespace();
-    let end = start + 10;
-    let after_ok = end == text.len() || text.as_bytes()[end].is_ascii_whitespace();
-    before_ok && after_ok
+    boundary_before(text, start) && boundary_after(text, start + 10)
+}
+
+fn boundary_before(text: &str, start: usize) -> bool {
+    start == 0 || text.as_bytes()[start - 1].is_ascii_whitespace()
+}
+
+fn boundary_after(text: &str, end: usize) -> bool {
+    end == text.len() || text.as_bytes()[end].is_ascii_whitespace()
 }
 
 #[cfg(test)]
@@ -83,5 +110,12 @@ mod tests {
         assert_eq!(changes[0].author, "Ada Lovelace");
         assert_eq!(changes[0].date, "2024-01-02");
         assert_eq!(changes[1].entity, "README.md");
+    }
+
+    #[test]
+    fn rejects_malformed_headers() {
+        assert!(GitLegacyParser.parse(&mut Cursor::new("[abc] subject without date")).is_err());
+        assert!(GitLegacyParser.parse(&mut Cursor::new("[abc]Ada2024-01-01 no-space")).is_err());
+        assert!(GitLegacyParser.parse(&mut Cursor::new("[abc] short")).is_err());
     }
 }

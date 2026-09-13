@@ -32,3 +32,17 @@ impl Table {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn limit_none_keeps_all_rows() {
+        let mut table = Table::with_headers(["col"]);
+        table.push_row(["a"]);
+        table.push_row(["b"]);
+        assert_eq!(table.clone().limit(None).rows.len(), 2);
+        assert_eq!(table.limit(Some(1)).rows.len(), 1);
+    }
+}

@@ -14,22 +14,48 @@ pub fn run(changes: &[Change], opts: &Options) -> Result<Table> {
     let reference = reference_date(changes, opts)?;
     let ref_ord = date_ordinal(&reference)?;
     let rev_counts = entity_revisions(changes);
+    let rows = collect_age_rows(latest, ref_ord, &rev_counts, opts)?;
+    Ok(build_age_table(rows, opts.rows))
+}
+
+fn collect_age_rows(
+    latest: BTreeMap<String, String>,
+    ref_ord: i64,
+    rev_counts: &BTreeMap<String, u64>,
+    opts: &Options,
+) -> Result<Vec<(String, u64)>> {
     let mut rows = Vec::new();
     for (entity, date) in latest {
-        let n_revs = rev_counts.get(&entity).copied().unwrap_or(0);
-        if !meets_min_revs(n_revs, opts) {
-            continue;
+        if let Some(row) = age_row(entity, &date, ref_ord, rev_counts, opts)? {
+            rows.push(row);
         }
-        let age = ref_ord - date_ordinal(&date)?;
-        let age_days = u64::try_from(age.max(0)).unwrap_or(0);
-        rows.push((entity, age_days));
     }
     rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    Ok(rows)
+}
+
+fn age_row(
+    entity: String,
+    date: &str,
+    ref_ord: i64,
+    rev_counts: &BTreeMap<String, u64>,
+    opts: &Options,
+) -> Result<Option<(String, u64)>> {
+    let n_revs = rev_counts.get(&entity).copied().unwrap_or(0);
+    if !meets_min_revs(n_revs, opts) {
+        return Ok(None);
+    }
+    let age = ref_ord - date_ordinal(date)?;
+    let age_days = u64::try_from(age.max(0)).unwrap_or(0);
+    Ok(Some((entity, age_days)))
+}
+
+fn build_age_table(rows: Vec<(String, u64)>, limit: Option<usize>) -> Table {
     let mut table = Table::with_headers(["entity", "age-days"]);
     for (entity, age) in rows {
         table.push_row([entity, fmt_u64(age)]);
     }
-    Ok(table.limit(opts.rows))
+    table.limit(limit)
 }
 
 fn latest_dates(changes: &[Change]) -> BTreeMap<String, String> {

@@ -16,6 +16,9 @@ pub mod output;
 pub mod parse;
 pub mod pipeline;
 
+#[cfg(test)]
+mod coverage_tests;
+
 #[doc(inline)]
 pub use analysis::{Table, analysis_names};
 #[doc(inline)]

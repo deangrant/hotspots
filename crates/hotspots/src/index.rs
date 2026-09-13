@@ -74,4 +74,15 @@ mod tests {
             Some(2)
         );
     }
+
+    #[test]
+    fn none_keeps_separate_revisions() {
+        let changes = vec![
+            Change::new("a", "Ada", "2024-01-01", "x.rs", None, None),
+            Change::new("b", "Ada", "2024-01-01", "y.rs", None, None),
+        ];
+        let index = ChangesetIndex::build(&changes, TemporalPeriod::None);
+        assert_eq!(index.by_rev.len(), 2);
+        assert_eq!(index.changesets().len(), 2);
+    }
 }

@@ -33,3 +33,16 @@ impl From<std::io::Error> for Error {
 
 /// Result alias for library operations.
 pub type Result<T> = std::result::Result<T, Error>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn display_and_io_conversion() {
+        assert_eq!(Error::msg("boom").to_string(), "boom");
+        let from_io = Error::from(std::io::Error::other("disk"));
+        assert!(from_io.to_string().contains("disk"));
+        let _: &dyn std::error::Error = &from_io;
+    }
+}

@@ -122,3 +122,69 @@ pub fn percent(numerator: u64, denominator: u64) -> f64 {
         (numerator as f64) * 100.0 / (denominator as f64)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn require_churn_rejects_missing_counts() {
+        let missing = [Change::new("1", "Ada", "2024-01-01", "a.rs", None, Some(1))];
+        assert!(require_churn(&missing).is_err());
+        let ok = [Change::new(
+            "1",
+            "Ada",
+            "2024-01-01",
+            "a.rs",
+            Some(1),
+            Some(0),
+        )];
+        assert!(require_churn(&ok).is_ok());
+    }
+
+    #[test]
+    fn parse_date_and_ordinal_edges() {
+        assert!(parse_date("2024-01-02").is_ok());
+        assert!(parse_date("bad").is_err());
+        assert!(parse_date("2024").is_err());
+        assert!(parse_date("2024-01-02-extra").is_err());
+        assert!(parse_date("2024-xx-01").is_err());
+        assert!(date_ordinal("2024-01-02").is_ok());
+        assert!(date_ordinal("2024-03-01").is_ok());
+    }
+
+    #[test]
+    fn percent_and_fmt_helpers() {
+        assert!((percent(0, 0) - 0.0).abs() < f64::EPSILON);
+        assert!(percent(1, 2) > 0.0);
+        assert_eq!(fmt_u64(9), "9");
+        assert_eq!(fmt_pct(12.345), "12.35");
+    }
+
+    #[test]
+    fn ordered_pair_and_thresholds() {
+        assert_eq!(ordered_pair("b", "a").0, "a");
+        assert_eq!(ordered_pair("a", "b").0, "a");
+        assert_eq!(count_as_u64(3), 3);
+        let opts = Options {
+            min_revs: 2,
+            ..Options::default()
+        };
+        assert!(!meets_min_revs(1, &opts));
+        assert!(meets_min_revs(2, &opts));
+    }
+
+    #[test]
+    fn entity_maps_count_distinct() {
+        let changes = [
+            Change::new("1", "Ada", "2024-01-01", "a.rs", None, None),
+            Change::new("2", "Ada", "2024-01-02", "a.rs", None, None),
+            Change::new("3", "Bea", "2024-01-03", "a.rs", None, None),
+        ];
+        assert_eq!(entity_revisions(&changes).get("a.rs").copied(), Some(3));
+        assert_eq!(
+            entity_authors(&changes).get("a.rs").map(BTreeSet::len),
+            Some(2)
+        );
+    }
+}

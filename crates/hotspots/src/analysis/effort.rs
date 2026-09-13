@@ -45,15 +45,10 @@ pub fn main_dev_by_revs(changes: &[Change], opts: &Options) -> Table {
         if !meets_min_revs(total, opts) {
             continue;
         }
-        let Some((author, author_revs)) = authors
-            .into_iter()
-            .map(|(author, revs)| (author, count_as_u64(revs.len())))
-            .max_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(&b.0)))
-        else {
-            continue;
-        };
-        let ownership = percent(author_revs, total);
-        rows.push((entity, author, author_revs, ownership));
+        if let Some((author, author_revs)) = leading_author_by_revs(authors) {
+            let ownership = percent(author_revs, total);
+            rows.push((entity, author, author_revs, ownership));
+        }
     }
     rows.sort_by(|a, b| a.0.cmp(&b.0));
     let mut table = Table::with_headers(["entity", "main-dev", "author-revs", "ownership"]);
@@ -115,6 +110,35 @@ fn fragmentation_score(authors: &BTreeMap<String, BTreeSet<String>>, total: u64)
     1.0 - sum_sq
 }
 
+fn leading_author_by_revs(authors: BTreeMap<String, BTreeSet<String>>) -> Option<(String, u64)> {
+    authors
+        .into_iter()
+        .map(|(author, revs)| (author, count_as_u64(revs.len())))
+        .max_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(&b.0)))
+}
+
 fn cmp_f64_desc(left: f64, right: f64) -> Ordering {
     right.partial_cmp(&left).map_or(Ordering::Equal, |order| order)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn leading_author_and_zero_fragmentation() {
+        assert!(leading_author_by_revs(BTreeMap::new()).is_none());
+        assert!((fragmentation_score(&BTreeMap::new(), 0) - 0.0).abs() < f64::EPSILON);
+        let mut authors = BTreeMap::new();
+        authors.insert(String::from("Ada"), BTreeSet::from([String::from("1")]));
+        authors.insert(
+            String::from("Bea"),
+            BTreeSet::from([String::from("2"), String::from("3")]),
+        );
+        assert_eq!(
+            leading_author_by_revs(authors.clone()),
+            Some((String::from("Bea"), 2))
+        );
+        assert!(fragmentation_score(&authors, 3) > 0.0);
+    }
 }

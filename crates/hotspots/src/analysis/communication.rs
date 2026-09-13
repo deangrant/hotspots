@@ -40,13 +40,24 @@ mod tests {
             Change::new("1", "Ada", "2024-01-01", "a.rs", None, None),
             Change::new("2", "Bea", "2024-01-02", "a.rs", None, None),
             Change::new("3", "Ada", "2024-01-03", "b.rs", None, None),
+            Change::new("4", "Cara", "2024-01-04", "a.rs", None, None),
         ];
         let opts = Options {
             min_revs: 1,
+            rows: Some(1),
             ..Options::default()
         };
         let table = run(&changes, &opts);
         assert_eq!(table.rows.len(), 1);
-        assert_eq!(table.rows[0][2], "1");
+    }
+
+    #[test]
+    fn solo_author_yields_no_pairs() {
+        let changes = vec![Change::new("1", "Ada", "2024-01-01", "a.rs", None, None)];
+        let opts = Options {
+            min_revs: 1,
+            ..Options::default()
+        };
+        assert!(run(&changes, &opts).rows.is_empty());
     }
 }

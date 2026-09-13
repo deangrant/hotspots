@@ -17,20 +17,30 @@ impl VcsParser for GitNumstatParser {
 }
 
 fn parse_header(line: &str) -> Result<Option<(String, String, String)>> {
-    if !line.starts_with("--") {
-        return Ok(None);
-    }
     let Some(rest) = line.strip_prefix("--") else {
         return Ok(None);
     };
+    parse_git2_fields(rest, line)
+}
+
+fn parse_git2_fields(rest: &str, line: &str) -> Result<Option<(String, String, String)>> {
     let mut parts = rest.splitn(3, "--");
-    let rev = parts.next().ok_or_else(|| Error::msg("git2 header missing rev"))?;
-    let date = parts.next().ok_or_else(|| Error::msg("git2 header missing date"))?;
-    let author = parts.next().ok_or_else(|| Error::msg("git2 header missing author"))?;
+    let rev = require_part(parts.next(), "rev")?;
+    let date = require_part(parts.next(), "date")?;
+    let author = require_part(parts.next(), "author")?;
+    ensure_git2_fields(rev, date, line)?;
+    Ok(Some((rev.to_owned(), author.to_owned(), date.to_owned())))
+}
+
+fn require_part<'a>(part: Option<&'a str>, label: &str) -> Result<&'a str> {
+    part.ok_or_else(|| Error::msg(format!("git2 header missing {label}")))
+}
+
+fn ensure_git2_fields(rev: &str, date: &str, line: &str) -> Result<()> {
     if rev.is_empty() || date.is_empty() {
         return Err(Error::msg(format!("malformed git2 header: {line}")));
     }
-    Ok(Some((rev.to_owned(), author.to_owned(), date.to_owned())))
+    Ok(())
 }
 
 #[cfg(test)]
@@ -54,5 +64,12 @@ mod tests {
         assert_eq!(changes[0].added, Some(10));
         assert_eq!(changes[1].added, Some(0));
         assert_eq!(changes[1].deleted, Some(0));
+    }
+
+    #[test]
+    fn rejects_incomplete_git2_headers() {
+        assert!(GitNumstatParser.parse(&mut Cursor::new("--onlyrev")).is_err());
+        assert!(GitNumstatParser.parse(&mut Cursor::new("--rev----author")).is_err());
+        assert!(GitNumstatParser.parse(&mut Cursor::new("----2024-01-01--Ada")).is_err());
     }
 }

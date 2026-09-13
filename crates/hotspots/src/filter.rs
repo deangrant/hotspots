@@ -70,4 +70,29 @@ mod tests {
         assert!(filter.allows("src/a.rs"));
         assert!(!filter.allows("docs/a.md"));
     }
+
+    #[test]
+    fn empty_exclude_prefix_never_matches() {
+        let filter = PathFilter::new(vec![], vec![String::new(), String::from("  /")]);
+        assert!(filter.allows("anything.rs"));
+    }
+
+    #[test]
+    fn trailing_slash_and_exact_prefix() {
+        let filter = PathFilter::new(vec![String::from("src/")], vec![]);
+        assert!(filter.allows("src"));
+        assert!(filter.allows("src/a.rs"));
+        assert!(!filter.allows("src2/a.rs"));
+    }
+
+    #[test]
+    fn apply_filters_change_entities() {
+        let filter = PathFilter::new(vec![String::from("src")], vec![]);
+        let kept = filter.apply(vec![
+            Change::new("1", "Ada", "2024-01-01", "src/a.rs", None, None),
+            Change::new("2", "Ada", "2024-01-01", "docs/b.rs", None, None),
+        ]);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].entity, "src/a.rs");
+    }
 }
