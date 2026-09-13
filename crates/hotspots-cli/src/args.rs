@@ -19,28 +19,6 @@ pub struct Args {
     pub help: bool,
 }
 
-type FlagHandler = fn(&[String], usize, &str, &mut Args) -> Result<usize, String>;
-
-const FLAGS: &[(&[&str], FlagHandler)] = &[
-    (&["-l", "--log"], set_log),
-    (&["-c", "--vcs"], set_vcs),
-    (&["-a", "--analysis"], set_analysis),
-    (&["-r", "--rows"], set_rows),
-    (&["-n", "--min-revs"], set_min_revs),
-    (&["-m", "--min-shared-revs"], set_min_shared_revs),
-    (&["-i", "--min-coupling"], set_min_coupling),
-    (&["-x", "--max-coupling"], set_max_coupling),
-    (&["-s", "--max-changeset-size"], set_max_changeset_size),
-    (&["-d", "--age-time-now"], set_age_time_now),
-    (&["-t", "--temporal-period"], set_temporal_period),
-    (&["-g", "--group"], set_group),
-    (&["--exclude"], set_exclude),
-    (&["--include"], set_include),
-    (&["--format"], set_format),
-    (&["--grain"], set_grain),
-    (&["--repo"], set_repo),
-];
-
 /// Parses process arguments.
 ///
 /// # Errors
@@ -89,149 +67,134 @@ fn parse_flag(
     index: usize,
     parsed: &mut Args,
 ) -> Result<usize, String> {
-    for &(names, handler) in FLAGS {
-        if names.contains(&flag) {
-            return handler(argv, index, flag, parsed);
-        }
+    if let Some(next) = try_string_flag(flag, argv, index, parsed)? {
+        return Ok(next);
+    }
+    if let Some(next) = try_int_flag(flag, argv, index, parsed)? {
+        return Ok(next);
+    }
+    if let Some(next) = try_optional_flag(flag, argv, index, parsed)? {
+        return Ok(next);
+    }
+    if let Some(next) = try_push_flag(flag, argv, index, parsed)? {
+        return Ok(next);
+    }
+    if let Some(next) = try_specialty_flag(flag, argv, index, parsed)? {
+        return Ok(next);
     }
     Err(format!("unknown argument `{flag}`"))
 }
 
-fn set_log(argv: &[String], index: usize, flag: &str, parsed: &mut Args) -> Result<usize, String> {
-    assign_string(argv, index, flag, &mut parsed.log)
-}
-
-fn set_vcs(argv: &[String], index: usize, flag: &str, parsed: &mut Args) -> Result<usize, String> {
-    assign_string(argv, index, flag, &mut parsed.vcs)
-}
-
-fn set_analysis(
+fn try_string_flag(
+    flag: &str,
     argv: &[String],
     index: usize,
-    flag: &str,
     parsed: &mut Args,
-) -> Result<usize, String> {
-    assign_string(argv, index, flag, &mut parsed.options.analysis)
+) -> Result<Option<usize>, String> {
+    let target = match flag {
+        "-l" | "--log" => &mut parsed.log,
+        "-c" | "--vcs" => &mut parsed.vcs,
+        "-a" | "--analysis" => &mut parsed.options.analysis,
+        _ => return Ok(None),
+    };
+    Ok(Some(assign_string(argv, index, flag, target)?))
 }
 
-fn set_rows(argv: &[String], index: usize, flag: &str, parsed: &mut Args) -> Result<usize, String> {
-    parsed.options.rows = Some(parse_int(require_value(argv, index, flag)?, flag)?);
-    Ok(index + 2)
-}
-
-fn set_min_revs(
+fn try_int_flag(
+    flag: &str,
     argv: &[String],
     index: usize,
-    flag: &str,
     parsed: &mut Args,
-) -> Result<usize, String> {
-    assign_int(argv, index, flag, &mut parsed.options.min_revs)
+) -> Result<Option<usize>, String> {
+    match flag {
+        "-n" | "--min-revs" => Ok(Some(assign_int(
+            argv,
+            index,
+            flag,
+            &mut parsed.options.min_revs,
+        )?)),
+        "-m" | "--min-shared-revs" => Ok(Some(assign_int(
+            argv,
+            index,
+            flag,
+            &mut parsed.options.min_shared_revs,
+        )?)),
+        "-i" | "--min-coupling" => Ok(Some(assign_int(
+            argv,
+            index,
+            flag,
+            &mut parsed.options.min_coupling,
+        )?)),
+        "-x" | "--max-coupling" => Ok(Some(assign_int(
+            argv,
+            index,
+            flag,
+            &mut parsed.options.max_coupling,
+        )?)),
+        "-s" | "--max-changeset-size" => Ok(Some(assign_int(
+            argv,
+            index,
+            flag,
+            &mut parsed.options.max_changeset_size,
+        )?)),
+        _ => Ok(None),
+    }
 }
 
-fn set_min_shared_revs(
+fn try_optional_flag(
+    flag: &str,
     argv: &[String],
     index: usize,
-    flag: &str,
     parsed: &mut Args,
-) -> Result<usize, String> {
-    assign_int(argv, index, flag, &mut parsed.options.min_shared_revs)
+) -> Result<Option<usize>, String> {
+    let target = match flag {
+        "-d" | "--age-time-now" => &mut parsed.options.age_time_now,
+        "-g" | "--group" => &mut parsed.options.group_file,
+        "--repo" => &mut parsed.options.repo,
+        _ => return Ok(None),
+    };
+    Ok(Some(assign_optional(argv, index, flag, target)?))
 }
 
-fn set_min_coupling(
+fn try_push_flag(
+    flag: &str,
     argv: &[String],
     index: usize,
-    flag: &str,
     parsed: &mut Args,
-) -> Result<usize, String> {
-    assign_int(argv, index, flag, &mut parsed.options.min_coupling)
+) -> Result<Option<usize>, String> {
+    let target = match flag {
+        "--exclude" => &mut parsed.options.exclude,
+        "--include" => &mut parsed.options.include,
+        _ => return Ok(None),
+    };
+    Ok(Some(push_string(argv, index, flag, target)?))
 }
 
-fn set_max_coupling(
+fn try_specialty_flag(
+    flag: &str,
     argv: &[String],
     index: usize,
-    flag: &str,
     parsed: &mut Args,
-) -> Result<usize, String> {
-    assign_int(argv, index, flag, &mut parsed.options.max_coupling)
-}
-
-fn set_max_changeset_size(
-    argv: &[String],
-    index: usize,
-    flag: &str,
-    parsed: &mut Args,
-) -> Result<usize, String> {
-    assign_int(argv, index, flag, &mut parsed.options.max_changeset_size)
-}
-
-fn set_age_time_now(
-    argv: &[String],
-    index: usize,
-    flag: &str,
-    parsed: &mut Args,
-) -> Result<usize, String> {
-    assign_optional(argv, index, flag, &mut parsed.options.age_time_now)
-}
-
-fn set_temporal_period(
-    argv: &[String],
-    index: usize,
-    flag: &str,
-    parsed: &mut Args,
-) -> Result<usize, String> {
-    parsed.options.temporal_period = parse_temporal(require_value(argv, index, flag)?)?;
-    Ok(index + 2)
-}
-
-fn set_group(
-    argv: &[String],
-    index: usize,
-    flag: &str,
-    parsed: &mut Args,
-) -> Result<usize, String> {
-    assign_optional(argv, index, flag, &mut parsed.options.group_file)
-}
-
-fn set_exclude(
-    argv: &[String],
-    index: usize,
-    flag: &str,
-    parsed: &mut Args,
-) -> Result<usize, String> {
-    push_string(argv, index, flag, &mut parsed.options.exclude)
-}
-
-fn set_include(
-    argv: &[String],
-    index: usize,
-    flag: &str,
-    parsed: &mut Args,
-) -> Result<usize, String> {
-    push_string(argv, index, flag, &mut parsed.options.include)
-}
-
-fn set_format(
-    argv: &[String],
-    index: usize,
-    flag: &str,
-    parsed: &mut Args,
-) -> Result<usize, String> {
-    parsed.format = OutputFormat::parse(require_value(argv, index, flag)?)?;
-    Ok(index + 2)
-}
-
-fn set_grain(
-    argv: &[String],
-    index: usize,
-    flag: &str,
-    parsed: &mut Args,
-) -> Result<usize, String> {
-    parsed.options.grain = Grain::parse(require_value(argv, index, flag)?)?;
-    Ok(index + 2)
-}
-
-fn set_repo(argv: &[String], index: usize, flag: &str, parsed: &mut Args) -> Result<usize, String> {
-    assign_optional(argv, index, flag, &mut parsed.options.repo)
+) -> Result<Option<usize>, String> {
+    match flag {
+        "-r" | "--rows" => {
+            parsed.options.rows = Some(parse_int(require_value(argv, index, flag)?, flag)?);
+            Ok(Some(index + 2))
+        }
+        "-t" | "--temporal-period" => {
+            parsed.options.temporal_period = parse_temporal(require_value(argv, index, flag)?)?;
+            Ok(Some(index + 2))
+        }
+        "--format" => {
+            parsed.format = OutputFormat::parse(require_value(argv, index, flag)?)?;
+            Ok(Some(index + 2))
+        }
+        "--grain" => {
+            parsed.options.grain = Grain::parse(require_value(argv, index, flag)?)?;
+            Ok(Some(index + 2))
+        }
+        _ => Ok(None),
+    }
 }
 
 fn assign_string(
@@ -297,8 +260,8 @@ fn validate(parsed: &Args) -> Result<(), String> {
 }
 
 fn validate_required(parsed: &Args) -> Result<(), String> {
-    require_log(parsed)?;
-    require_vcs(parsed)?;
+    require_non_empty(&parsed.log, "-l/--log")?;
+    require_non_empty(&parsed.vcs, "-c/--vcs")?;
     require_repo_for_function(parsed)
 }
 
@@ -309,16 +272,9 @@ fn validate_options(parsed: &Args) -> Result<(), String> {
     require_age_time_now(parsed)
 }
 
-fn require_log(parsed: &Args) -> Result<(), String> {
-    if parsed.log.is_empty() {
-        return Err(String::from("missing required `-l/--log`"));
-    }
-    Ok(())
-}
-
-fn require_vcs(parsed: &Args) -> Result<(), String> {
-    if parsed.vcs.is_empty() {
-        return Err(String::from("missing required `-c/--vcs`"));
+fn require_non_empty(value: &str, flag: &str) -> Result<(), String> {
+    if value.is_empty() {
+        return Err(format!("missing required `{flag}`"));
     }
     Ok(())
 }

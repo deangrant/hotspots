@@ -1,13 +1,12 @@
 //! Composite maintenance-risk score per entity.
 
-use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use crate::analysis::effort;
 use crate::analysis::hotspots;
 use crate::analysis::soc;
 use crate::analysis::table::Table;
-use crate::analysis::util::{entity_revisions, fmt_pct, fmt_u64, meets_min_revs};
+use crate::analysis::util::{cmp_f64_desc, entity_revisions, fmt_pct, fmt_u64, meets_min_revs};
 use crate::model::Change;
 use crate::options::Options;
 
@@ -184,10 +183,6 @@ fn build_table(rows: Vec<(String, f64, Components)>, limit: Option<usize>) -> Ta
         ]);
     }
     table.limit(limit)
-}
-
-fn cmp_f64_desc(left: f64, right: f64) -> Ordering {
-    right.partial_cmp(&left).map_or(Ordering::Equal, |order| order)
 }
 
 #[cfg(test)]

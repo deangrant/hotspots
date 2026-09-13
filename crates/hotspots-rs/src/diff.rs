@@ -55,23 +55,25 @@ fn parse_range(raw: &str) -> Option<(u32, u32)> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn parses_standard_hunk_header() {
-        let hunks = parse_hunks("@@ -10,0 +12,3 @@ fn foo\n+a\n+b\n+c\n");
+    fn assert_hunk(hunks: &[Hunk], old: (u32, u32), new: (u32, u32)) {
         assert_eq!(hunks.len(), 1);
-        assert_eq!(hunks[0].old_start, 10);
-        assert_eq!(hunks[0].old_count, 0);
-        assert_eq!(hunks[0].new_start, 12);
-        assert_eq!(hunks[0].new_count, 3);
+        assert_eq!(hunks[0].old_start, old.0);
+        assert_eq!(hunks[0].old_count, old.1);
+        assert_eq!(hunks[0].new_start, new.0);
+        assert_eq!(hunks[0].new_count, new.1);
     }
 
     #[test]
-    fn parses_single_line_range_and_ignores_noise() {
-        let hunks = parse_hunks("diff --git a/x b/x\n@@ -5 +7 @@\n");
-        assert_eq!(hunks.len(), 1);
-        assert_eq!(hunks[0].old_start, 5);
-        assert_eq!(hunks[0].old_count, 1);
-        assert_eq!(hunks[0].new_start, 7);
-        assert_eq!(hunks[0].new_count, 1);
+    fn parses_hunk_headers() {
+        assert_hunk(
+            &parse_hunks("@@ -10,0 +12,3 @@ fn foo\n+a\n+b\n+c\n"),
+            (10, 0),
+            (12, 3),
+        );
+        assert_hunk(
+            &parse_hunks("diff --git a/x b/x\n@@ -5 +7 @@\n"),
+            (5, 1),
+            (7, 1),
+        );
     }
 }

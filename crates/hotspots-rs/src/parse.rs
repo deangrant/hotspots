@@ -144,11 +144,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn extracts_fn_and_impl_method() {
-        let src = "fn alpha() {}\nimpl Foo { fn beta(&self) {} }\n";
-        let facts = symbols_from_source("a.rs", src).unwrap_or_default();
-        assert!(facts.iter().any(|f| f.name == "alpha"));
-        assert!(facts.iter().any(|f| f.name == "Foo::beta"));
+    fn extracts_fn_impl_and_trait_methods() {
+        let fn_impl =
+            symbols_from_source("a.rs", "fn alpha() {}\nimpl Foo { fn beta(&self) {} }\n")
+                .unwrap_or_default();
+        assert!(fn_impl.iter().any(|f| f.name == "alpha"));
+        assert!(fn_impl.iter().any(|f| f.name == "Foo::beta"));
+
+        let traits = symbols_from_source(
+            "a.rs",
+            "trait Foo { fn bar(&self); }\nmod a { trait Baz { fn qux(&self); } }\n",
+        )
+        .unwrap_or_default();
+        assert!(traits.iter().any(|f| f.name == "Foo::bar"));
+        assert!(traits.iter().any(|f| f.name == "a::Baz::qux"));
     }
 
     #[test]
@@ -190,14 +199,6 @@ impl TraitB for Foo { fn m(&self) {} }
         let first = facts.iter().find(|f| f.name == "twin#1");
         let second = facts.iter().find(|f| f.name == "twin#2");
         assert!(first.is_some_and(|f| f.start_line < second.map_or(0, |s| s.start_line)));
-    }
-
-    #[test]
-    fn extracts_trait_methods() {
-        let src = "trait Foo { fn bar(&self); }\nmod a { trait Baz { fn qux(&self); } }\n";
-        let facts = symbols_from_source("a.rs", src).unwrap_or_default();
-        assert!(facts.iter().any(|f| f.name == "Foo::bar"));
-        assert!(facts.iter().any(|f| f.name == "a::Baz::qux"));
     }
 
     #[test]

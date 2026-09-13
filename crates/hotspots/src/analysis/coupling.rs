@@ -93,7 +93,7 @@ fn pair_shared_counts(
     index: &ChangesetIndex,
     max_changeset_size: usize,
 ) -> BTreeMap<(String, String), u64> {
-    let mut shared: BTreeMap<(String, String), u64> = BTreeMap::new();
+    let mut shared = BTreeMap::new();
     for changeset in index.changesets() {
         count_pairs_in_changeset(&mut shared, changeset, max_changeset_size);
     }
@@ -136,12 +136,7 @@ mod tests {
     }
 
     fn pair_changes() -> Vec<Change> {
-        vec![
-            Change::new("1", "Ada", "2024-01-01", "a.rs", None, None),
-            Change::new("1", "Ada", "2024-01-01", "b.rs", None, None),
-            Change::new("2", "Ada", "2024-01-02", "a.rs", None, None),
-            Change::new("2", "Ada", "2024-01-02", "b.rs", None, None),
-        ]
+        crate::analysis::fixtures::pair_changes_on(["2024-01-01", "2024-01-02"])
     }
 
     #[test]
@@ -185,20 +180,11 @@ mod tests {
         assert!(table.rows.iter().all(|row| row[0] != "lonely.rs" && row[1] != "lonely.rs"));
     }
 
-    fn same_day_pair_changes() -> Vec<Change> {
-        vec![
-            Change::new("1", "Ada", "2024-01-01", "a.rs", None, None),
-            Change::new("1", "Ada", "2024-01-01", "b.rs", None, None),
-            Change::new("2", "Ada", "2024-01-01", "a.rs", None, None),
-            Change::new("2", "Ada", "2024-01-01", "b.rs", None, None),
-        ]
-    }
-
     #[test]
     fn day_period_degree_uses_logical_revisions() {
         let mut o = opts();
         o.temporal_period = crate::options::TemporalPeriod::Day;
-        let table = run(&same_day_pair_changes(), &o);
+        let table = run(&crate::analysis::fixtures::same_day_pair_changes(), &o);
         assert_eq!(table.rows.len(), 1);
         assert_eq!(table.rows[0][2], "100");
     }
@@ -208,7 +194,7 @@ mod tests {
         let mut o = opts();
         o.temporal_period = crate::options::TemporalPeriod::Day;
         o.min_revs = 2;
-        assert!(run(&same_day_pair_changes(), &o).rows.is_empty());
+        assert!(run(&crate::analysis::fixtures::same_day_pair_changes(), &o).rows.is_empty());
     }
 
     fn changeset_of_size(n: usize) -> Vec<Change> {

@@ -16,6 +16,9 @@ mod summary;
 mod table;
 pub(crate) mod util;
 
+#[cfg(test)]
+pub(crate) mod fixtures;
+
 use crate::error::{Error, Result};
 use crate::model::Change;
 use crate::options::Options;

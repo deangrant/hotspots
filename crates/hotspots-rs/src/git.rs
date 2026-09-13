@@ -6,7 +6,7 @@
 use std::ffi::OsString;
 use std::io::Read;
 use std::path::Path;
-use std::process::{Child, ChildStderr, ChildStdout, Command, ExitStatus, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -44,8 +44,8 @@ struct GitSession {
 
 fn start_git_session(repo: &Path, args: &[&str]) -> Result<GitSession> {
     let mut child = spawn_git(repo, args)?;
-    let stdout = take_stdout(&mut child)?;
-    let stderr = take_stderr(&mut child)?;
+    let stdout = take_pipe(child.stdout.take(), "stdout")?;
+    let stderr = take_pipe(child.stderr.take(), "stderr")?;
     Ok(GitSession {
         child,
         stdout_handle: spawn_reader(stdout),
@@ -76,12 +76,8 @@ fn spawn_git(repo: &Path, args: &[&str]) -> Result<Child> {
         .map_err(|e| Error::git(format!("failed to run git: {e}")))
 }
 
-fn take_stdout(child: &mut Child) -> Result<ChildStdout> {
-    child.stdout.take().ok_or_else(|| Error::git("git stdout pipe missing"))
-}
-
-fn take_stderr(child: &mut Child) -> Result<ChildStderr> {
-    child.stderr.take().ok_or_else(|| Error::git("git stderr pipe missing"))
+fn take_pipe<T>(pipe: Option<T>, stream: &str) -> Result<T> {
+    pipe.ok_or_else(|| Error::git(format!("git {stream} pipe missing")))
 }
 
 fn spawn_reader(

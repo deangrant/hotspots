@@ -33,13 +33,12 @@ impl Grain {
     ///
     /// Returns an error when `raw` is not a known grain name.
     pub fn parse(raw: &str) -> std::result::Result<Self, String> {
-        match raw {
-            "file" => Ok(Self::File),
-            "function" => Ok(Self::Function),
-            other => Err(format!(
-                "invalid grain `{other}`; expected `file` or `function`"
-            )),
-        }
+        crate::keyword::parse_keyword(
+            raw,
+            &[("file", Self::File), ("function", Self::Function)],
+            "grain",
+            "`file` or `function`",
+        )
     }
 }
 

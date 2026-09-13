@@ -1,8 +1,11 @@
 //! Shared helpers for metric engines.
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::analysis::table::Table;
 use crate::error::{Error, Result};
+use crate::index::{Changeset, ChangesetIndex};
 use crate::model::Change;
 use crate::options::Options;
 
@@ -62,6 +65,36 @@ pub fn fmt_u64(value: u64) -> String {
 /// Formats a floating percentage with two fraction digits.
 pub fn fmt_pct(value: f64) -> String {
     format!("{value:.2}")
+}
+
+/// Compares floats descending, treating incomparable values as equal.
+pub fn cmp_f64_desc(left: f64, right: f64) -> Ordering {
+    right.partial_cmp(&left).map_or(Ordering::Equal, |order| order)
+}
+
+/// Builds a two-column table of entity and unsigned metric, then applies `limit`.
+pub fn build_entity_u64_table(
+    headers: [&str; 2],
+    rows: Vec<(String, u64)>,
+    limit: Option<usize>,
+) -> Table {
+    let mut table = Table::with_headers(headers);
+    for (entity, value) in rows {
+        table.push_row([entity, fmt_u64(value)]);
+    }
+    table.limit(limit)
+}
+
+/// Folds over every changeset in `index`, visiting each with `visit`.
+pub fn fold_changesets<T: Default>(
+    index: &ChangesetIndex,
+    mut visit: impl FnMut(&mut T, &Changeset),
+) -> T {
+    let mut acc = T::default();
+    for changeset in index.changesets() {
+        visit(&mut acc, changeset);
+    }
+    acc
 }
 
 /// Returns `(left, right)` ordered lexicographically for stable pair keys.

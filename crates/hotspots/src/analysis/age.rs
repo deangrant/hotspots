@@ -3,7 +3,9 @@
 use std::collections::BTreeMap;
 
 use crate::analysis::table::Table;
-use crate::analysis::util::{date_ordinal, entity_revisions, fmt_u64, meets_min_revs};
+use crate::analysis::util::{
+    build_entity_u64_table, date_ordinal, entity_revisions, meets_min_revs,
+};
 use crate::error::{Error, Result};
 use crate::model::Change;
 use crate::options::Options;
@@ -15,7 +17,11 @@ pub fn run(changes: &[Change], opts: &Options) -> Result<Table> {
     let ref_ord = date_ordinal(&reference)?;
     let rev_counts = entity_revisions(changes);
     let rows = collect_age_rows(latest, ref_ord, &rev_counts, opts)?;
-    Ok(build_age_table(rows, opts.rows))
+    Ok(build_entity_u64_table(
+        ["entity", "age-days"],
+        rows,
+        opts.rows,
+    ))
 }
 
 fn collect_age_rows(
@@ -48,14 +54,6 @@ fn age_row(
     let age = ref_ord - date_ordinal(date)?;
     let age_days = u64::try_from(age.max(0)).unwrap_or(0);
     Ok(Some((entity, age_days)))
-}
-
-fn build_age_table(rows: Vec<(String, u64)>, limit: Option<usize>) -> Table {
-    let mut table = Table::with_headers(["entity", "age-days"]);
-    for (entity, age) in rows {
-        table.push_row([entity, fmt_u64(age)]);
-    }
-    table.limit(limit)
 }
 
 fn latest_dates(changes: &[Change]) -> BTreeMap<String, String> {

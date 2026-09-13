@@ -3,7 +3,9 @@
 use std::collections::BTreeMap;
 
 use crate::analysis::table::Table;
-use crate::analysis::util::{count_as_u64, fmt_u64, meets_min_revs};
+use crate::analysis::util::{
+    build_entity_u64_table, count_as_u64, fold_changesets, meets_min_revs,
+};
 use crate::index::{Changeset, ChangesetIndex};
 use crate::model::Change;
 use crate::options::Options;
@@ -15,15 +17,13 @@ pub fn run(changes: &[Change], opts: &Options) -> Table {
     let scores = accumulate_scores(&index, opts.max_changeset_size);
     let mut rows = filter_scores(scores, &revs, opts);
     rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
-    build_soc_table(rows, opts.rows)
+    build_entity_u64_table(["entity", "soc"], rows, opts.rows)
 }
 
 fn accumulate_scores(index: &ChangesetIndex, max_changeset_size: usize) -> BTreeMap<String, u64> {
-    let mut scores: BTreeMap<String, u64> = BTreeMap::new();
-    for changeset in index.changesets() {
-        add_changeset_score(&mut scores, changeset, max_changeset_size);
-    }
-    scores
+    fold_changesets(index, |scores, changeset| {
+        add_changeset_score(scores, changeset, max_changeset_size);
+    })
 }
 
 /// SOC scores for every entity that appears in eligible changesets.
@@ -64,14 +64,6 @@ fn filter_scores(
         .collect()
 }
 
-fn build_soc_table(rows: Vec<(String, u64)>, limit: Option<usize>) -> Table {
-    let mut table = Table::with_headers(["entity", "soc"]);
-    for (entity, soc) in rows {
-        table.push_row([entity, fmt_u64(soc)]);
-    }
-    table.limit(limit)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,12 +97,7 @@ mod tests {
     }
 
     fn same_day_pair_changes() -> Vec<Change> {
-        vec![
-            Change::new("1", "Ada", "2024-01-01", "a.rs", None, None),
-            Change::new("1", "Ada", "2024-01-01", "b.rs", None, None),
-            Change::new("2", "Ada", "2024-01-01", "a.rs", None, None),
-            Change::new("2", "Ada", "2024-01-01", "b.rs", None, None),
-        ]
+        crate::analysis::fixtures::same_day_pair_changes()
     }
 
     #[test]

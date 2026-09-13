@@ -1,10 +1,11 @@
 //! Commit-based effort, main-dev-by-revs, and fragmentation.
 
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::analysis::table::Table;
-use crate::analysis::util::{count_as_u64, fmt_pct, fmt_u64, meets_min_revs, percent};
+use crate::analysis::util::{
+    cmp_f64_desc, count_as_u64, fmt_pct, fmt_u64, meets_min_revs, percent,
+};
 use crate::model::Change;
 use crate::options::Options;
 
@@ -126,10 +127,6 @@ fn leading_author_by_revs(authors: BTreeMap<String, BTreeSet<String>>) -> Option
         .into_iter()
         .map(|(author, revs)| (author, count_as_u64(revs.len())))
         .max_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(&b.0)))
-}
-
-fn cmp_f64_desc(left: f64, right: f64) -> Ordering {
-    right.partial_cmp(&left).map_or(Ordering::Equal, |order| order)
 }
 
 #[cfg(test)]

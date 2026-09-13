@@ -90,15 +90,15 @@ fn append_escaped(out: &mut String, ch: char) {
     out.push(ch);
 }
 
-fn simple_escape(ch: char) -> Option<&'static str> {
-    const TABLE: &[(char, &str)] = &[
-        ('"', "\\\""),
-        ('\\', "\\\\"),
-        ('\n', "\\n"),
-        ('\r', "\\r"),
-        ('\t', "\\t"),
-    ];
-    TABLE.iter().find(|(c, _)| *c == ch).map(|(_, s)| *s)
+const fn simple_escape(ch: char) -> Option<&'static str> {
+    match ch {
+        '"' => Some("\\\""),
+        '\\' => Some("\\\\"),
+        '\n' => Some("\\n"),
+        '\r' => Some("\\r"),
+        '\t' => Some("\\t"),
+        _ => None,
+    }
 }
 
 fn push_unicode_escape(out: &mut String, ch: char) {

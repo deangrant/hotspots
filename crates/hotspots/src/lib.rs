@@ -11,6 +11,7 @@ pub mod error;
 pub mod filter;
 pub mod group;
 pub mod index;
+pub mod keyword;
 pub mod model;
 pub mod options;
 pub mod output;
