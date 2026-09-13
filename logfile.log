@@ -1,3 +1,8 @@
+--d445d82--2026-09-13--Dean Grant
+2	0	README.md
+71	4	crates/hotspots-rs/src/resolve.rs
+42	0	logfile.log
+
 --f2bcca9--2026-09-13--Dean Grant
 45	0	Cargo.lock
 1	1	Cargo.toml

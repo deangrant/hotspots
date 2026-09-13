@@ -14,7 +14,8 @@ use std::path::Path;
 /// Expands changes for function grain, or returns them unchanged for file grain.
 ///
 /// Non-`.rs` paths are dropped under function grain. Their count is returned in
-/// [`ExpandStats::dropped_non_rust`].
+/// [`ExpandStats::dropped_non_rust`]. Paths whose hunks miss all function/method
+/// symbols are dropped and counted in [`ExpandStats::dropped_no_overlap`].
 ///
 /// # Errors
 ///

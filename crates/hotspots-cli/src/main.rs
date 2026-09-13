@@ -77,14 +77,20 @@ const fn function_resolver(grain: Grain) -> Option<RustGitSynResolver> {
 }
 
 fn note_dropped_paths(stats: ExpandStats) {
-    if stats.dropped_non_rust == 0 {
-        return;
+    if stats.dropped_non_rust > 0 {
+        let _ = writeln!(
+            io::stderr(),
+            "note: dropped {} non-Rust path(s) under --grain function",
+            stats.dropped_non_rust
+        );
     }
-    let _ = writeln!(
-        io::stderr(),
-        "note: dropped {} non-Rust path(s) under --grain function",
-        stats.dropped_non_rust
-    );
+    if stats.dropped_no_overlap > 0 {
+        let _ = writeln!(
+            io::stderr(),
+            "note: dropped {} path(s) with no function/method overlap under --grain function",
+            stats.dropped_no_overlap
+        );
+    }
 }
 
 #[cfg(test)]

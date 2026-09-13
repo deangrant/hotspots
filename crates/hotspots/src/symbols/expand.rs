@@ -10,9 +10,12 @@ pub use crate::symbols::types::ExpandStats;
 
 /// Expands each change using the matching [`FileDiff`] keyed by `(rev, path)`.
 ///
+/// Rust paths whose hunks overlap no symbols are dropped and counted in
+/// [`ExpandStats::dropped_no_overlap`].
+///
 /// # Errors
 ///
-/// Returns an error when a Rust path lacks a diff, or hunks overlap no symbols.
+/// Returns an error when a Rust path lacks a matching diff.
 pub fn expand_with_diffs(
     changes: &[Change],
     diffs: &BTreeMap<(String, String), FileDiff>,
@@ -31,31 +34,28 @@ pub fn expand_with_diffs(
                 change.entity, change.rev
             ))
         })?;
-        out.extend(expand_file_change(change, diff)?);
+        let expanded = expand_file_change(change, diff);
+        if !diff.hunks.is_empty() && expanded.is_empty() {
+            stats.dropped_no_overlap = stats.dropped_no_overlap.saturating_add(1);
+        }
+        out.extend(expanded);
     }
     Ok((out, stats))
 }
 
 /// Expands one file-level change into zero or more symbol-level changes.
 ///
-/// # Errors
-///
-/// Returns an error when hunks exist but no symbol receives churn.
-pub fn expand_file_change(change: &Change, diff: &FileDiff) -> Result<Vec<Change>> {
+/// Returns an empty list when hunks exist but no symbol receives churn.
+#[must_use]
+pub fn expand_file_change(change: &Change, diff: &FileDiff) -> Vec<Change> {
     if diff.hunks.is_empty() {
-        return Ok(Vec::new());
+        return Vec::new();
     }
     let mut totals: BTreeMap<String, (u64, u64)> = BTreeMap::new();
     for hunk in &diff.hunks {
         attribute_hunk(hunk, &diff.symbols_new, &diff.symbols_old, &mut totals);
     }
-    if totals.is_empty() {
-        return Err(Error::msg(format!(
-            "no symbol overlap for `{}` at `{}`",
-            change.entity, change.rev
-        )));
-    }
-    Ok(totals
+    totals
         .into_iter()
         .map(|(name, (added, deleted))| {
             Change::new(
@@ -67,7 +67,7 @@ pub fn expand_file_change(change: &Change, diff: &FileDiff) -> Result<Vec<Change
                 Some(deleted),
             )
         })
-        .collect())
+        .collect()
 }
 
 fn attribute_hunk(
@@ -148,14 +148,13 @@ mod tests {
             }],
         };
         let rows = expand_file_change(&change, &diff);
-        assert!(rows.as_ref().is_ok_and(|r| r.len() == 1));
-        let rows = rows.unwrap_or_default();
+        assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].entity, "a.rs::foo");
         assert_eq!(rows[0].added, Some(2));
     }
 
     #[test]
-    fn errors_when_hunks_miss_symbols() {
+    fn skips_when_hunks_miss_symbols() {
         let change = Change::new("abc", "Ada", "2024-01-01", "a.rs", Some(1), Some(0));
         let diff = FileDiff {
             rev: String::from("abc"),
@@ -169,7 +168,20 @@ mod tests {
                 new_count: 1,
             }],
         };
-        assert!(expand_file_change(&change, &diff).is_err());
+        let mut diffs = BTreeMap::new();
+        diffs.insert((String::from("abc"), String::from("a.rs")), diff.clone());
+        let expanded = expand_with_diffs(&[change], &diffs);
+        assert!(
+            expanded
+                .is_ok_and(|(rows, stats)| { rows.is_empty() && stats.dropped_no_overlap == 1 })
+        );
+        assert!(
+            expand_file_change(
+                &Change::new("abc", "Ada", "2024-01-01", "a.rs", Some(1), Some(0)),
+                &diff
+            )
+            .is_empty()
+        );
     }
 
     #[test]

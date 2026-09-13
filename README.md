@@ -50,9 +50,11 @@ Deleted or renamed-away paths load symbols from the parent blob (`REV^:PATH`);
 missing on both sides still fails closed.
 
 Non-Rust paths are **dropped** under function grain (a stderr note reports the
-count). Use `--include` to restrict the log to Rust trees when mixed languages
-are present. Failures (missing repo, git errors, unparsable `.rs`) abort the run;
-there is no silent fallback to file grain.
+count). Changes whose hunks miss all `fn`/`impl` symbols (typical crate roots
+or `mod`/`use`-only edits) are also dropped with a stderr count. Use
+`--include` to restrict the log to Rust trees when mixed languages are present.
+Failures (missing repo, git errors, unparsable `.rs`) abort the run; there is
+no silent fallback to file grain.
 
 ```bash
 hotspots -l logfile.log -c git2 --grain function --repo . -n 1 -r 20
