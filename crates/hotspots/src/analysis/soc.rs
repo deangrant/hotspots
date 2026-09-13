@@ -124,4 +124,26 @@ mod tests {
         opts.min_revs = 1;
         assert!(!run(&same_day_pair_changes(), &opts).rows.is_empty());
     }
+
+    fn changeset_entities(n: usize) -> Changeset {
+        let entities = (0..n).map(|i| format!("f{i}.rs")).collect();
+        Changeset {
+            rev: String::from("r"),
+            author: String::from("Ada"),
+            date: String::from("2024-01-01"),
+            entities,
+        }
+    }
+
+    #[test]
+    fn accepts_limit_sized_changeset_and_skips_limit_plus_one() {
+        let limit = crate::options::MAX_CHANGESET_SIZE_LIMIT;
+        let mut scores = BTreeMap::new();
+        add_changeset_score(&mut scores, &changeset_entities(limit), limit);
+        assert_eq!(scores.len(), limit);
+        assert_eq!(scores.get("f0.rs"), Some(&(count_as_u64(limit) - 1)));
+        scores.clear();
+        add_changeset_score(&mut scores, &changeset_entities(limit + 1), limit);
+        assert!(scores.is_empty());
+    }
 }

@@ -210,4 +210,19 @@ mod tests {
         o.min_revs = 2;
         assert!(run(&same_day_pair_changes(), &o).rows.is_empty());
     }
+
+    fn changeset_of_size(n: usize) -> Vec<Change> {
+        (0..n)
+            .map(|i| Change::new("1", "Ada", "2024-01-01", format!("f{i}.rs"), None, None))
+            .collect()
+    }
+
+    #[test]
+    fn accepts_limit_sized_changeset_and_skips_limit_plus_one() {
+        let limit = crate::options::MAX_CHANGESET_SIZE_LIMIT;
+        let mut o = opts();
+        o.max_changeset_size = limit;
+        assert!(!run(&changeset_of_size(limit), &o).rows.is_empty());
+        assert!(run(&changeset_of_size(limit + 1), &o).rows.is_empty());
+    }
 }
