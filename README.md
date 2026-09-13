@@ -1,8 +1,8 @@
 # hotspots
 
 Command-line tool that mines **exported Git history logs** and prints
-maintenance metrics: churn, ownership, age, coupling, communication, and related
-code-health signals.
+**JSON** maintenance metrics: churn, ownership, age, coupling, communication,
+and related code-health signals.
 
 Metrics are **indicators**, not blame. High coupling can be intentional; treat
 results as prompts for investigation.
@@ -14,7 +14,8 @@ cargo build -p hotspots-cli --release
 cargo run -p hotspots-cli -- -l logfile.log -c git2 -a summary
 ```
 
-The binary name is `hotspots`.
+The binary name is `hotspots`. Analysis results are written to stdout as a JSON
+array of objects.
 
 ## Generate a Git log
 
@@ -48,15 +49,15 @@ cargo run -p hotspots-cli -- -l logfile.log -c git2 -a coupling
 cargo run -p hotspots-cli -- -l logfile.log -c git2 -a revisions \
   --exclude vendor --exclude node_modules
 
-# JSON output
-cargo run -p hotspots-cli -- -l logfile.log -c git2 -a summary --format json
+# Summary as JSON on stdout
+cargo run -p hotspots-cli -- -l logfile.log -c git2 -a summary
 ```
 
 See `hotspots --help` for the full flag and analysis list.
 
 ## Workspace
 
-- `crates/hotspots` — library (parsers, filters, metrics, CSV/JSON writers)
+- `crates/hotspots` — library (parsers, filters, metrics, JSON writer)
 - `crates/hotspots-cli` — thin CLI composition root
 
 Dependencies are intentionally limited to the Rust standard library.

@@ -23,7 +23,7 @@ pub use error::{Error, Result};
 #[doc(inline)]
 pub use model::Change;
 #[doc(inline)]
-pub use options::{Options, OutputFormat, TemporalPeriod};
+pub use options::{Options, TemporalPeriod};
 #[doc(inline)]
 pub use output::write_table;
 #[doc(inline)]

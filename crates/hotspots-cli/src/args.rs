@@ -1,6 +1,6 @@
 //! Command-line argument parsing for the hotspots binary.
 
-use hotspots::{Options, OutputFormat, TemporalPeriod, analysis_names};
+use hotspots::{Options, TemporalPeriod, analysis_names};
 
 /// Parsed CLI invocation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -89,10 +89,6 @@ fn parse_flag(
         "-g" | "--group" => assign_optional(argv, index, flag, &mut parsed.options.group_file),
         "--exclude" => push_string(argv, index, flag, &mut parsed.options.exclude),
         "--include" => push_string(argv, index, flag, &mut parsed.options.include),
-        "--format" => {
-            parsed.options.format = parse_format(require_value(argv, index, flag)?)?;
-            Ok(index + 2)
-        }
         other => Err(format!("unknown argument `{other}`")),
     }
 }
@@ -148,16 +144,6 @@ fn parse_temporal(raw: &str) -> Result<TemporalPeriod, String> {
     }
 }
 
-fn parse_format(raw: &str) -> Result<OutputFormat, String> {
-    match raw {
-        "csv" => Ok(OutputFormat::Csv),
-        "json" => Ok(OutputFormat::Json),
-        other => Err(format!(
-            "invalid format `{other}`; expected `csv` or `json`"
-        )),
-    }
-}
-
 fn validate(parsed: &Args) -> Result<(), String> {
     if parsed.log.is_empty() {
         return Err(String::from("missing required `-l/--log`"));
@@ -194,8 +180,9 @@ Options:
   -g, --group FILE               Layer map (`prefix => layer` lines)
       --exclude PREFIX           Drop matching paths (repeatable)
       --include PREFIX           Keep only matching paths (repeatable)
-      --format csv|json          Output format (default: csv)
   -h, --help                     Show this help
+
+Output is a JSON array of objects on stdout.
 
 Analyses:
   {analyses}

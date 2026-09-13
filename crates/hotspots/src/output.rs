@@ -1,45 +1,16 @@
-//! CSV and JSON writers for analysis tables.
+//! JSON writer for analysis tables.
 
 use std::io::Write;
 
 use crate::analysis::Table;
 use crate::error::Result;
-use crate::options::OutputFormat;
 
-/// Writes a table using the selected output format.
+/// Writes a table as a JSON array of flat objects.
 ///
 /// # Errors
 ///
 /// Returns an error when writing to `out` fails.
-pub fn write_table(out: &mut dyn Write, table: &Table, format: OutputFormat) -> Result<()> {
-    match format {
-        OutputFormat::Csv => write_csv(out, table),
-        OutputFormat::Json => write_json(out, table),
-    }
-}
-
-fn write_csv(out: &mut dyn Write, table: &Table) -> Result<()> {
-    writeln!(out, "{}", join_csv(&table.headers))?;
-    for row in &table.rows {
-        writeln!(out, "{}", join_csv(row))?;
-    }
-    Ok(())
-}
-
-fn join_csv(fields: &[String]) -> String {
-    fields.iter().map(|field| escape_csv(field)).collect::<Vec<_>>().join(",")
-}
-
-fn escape_csv(field: &str) -> String {
-    if field.contains([',', '"', '\n', '\r']) {
-        let escaped = field.replace('"', "\"\"");
-        format!("\"{escaped}\"")
-    } else {
-        field.to_owned()
-    }
-}
-
-fn write_json(out: &mut dyn Write, table: &Table) -> Result<()> {
+pub fn write_table(out: &mut dyn Write, table: &Table) -> Result<()> {
     writeln!(out, "[")?;
     for (index, row) in table.rows.iter().enumerate() {
         write!(out, "  {{")?;
@@ -89,13 +60,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn csv_escapes_commas() {
+    fn json_escapes_quotes() {
         let mut table = Table::with_headers(["a", "b"]);
-        table.push_row(["x,y", "z"]);
+        table.push_row(["x\"y", "z"]);
         let mut buf = Vec::new();
-        let written = write_csv(&mut buf, &table);
+        let written = write_table(&mut buf, &table);
         assert!(written.is_ok(), "{:?}", written.err());
         let text = String::from_utf8(buf).unwrap_or_default();
-        assert!(text.contains("\"x,y\""));
+        assert!(text.contains("\\\""));
+        assert!(text.starts_with('['));
     }
 }

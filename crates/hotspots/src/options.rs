@@ -1,14 +1,5 @@
 //! Tunables that control filtering and metric engines.
 
-/// How tabular results are serialized.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OutputFormat {
-    /// Comma-separated values with a header row.
-    Csv,
-    /// JSON array of flat objects.
-    Json,
-}
-
 /// Optional same-day commit merging for coupling-style metrics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TemporalPeriod {
@@ -45,8 +36,6 @@ pub struct Options {
     pub exclude: Vec<String>,
     /// Optional layer map file path.
     pub group_file: Option<String>,
-    /// Output encoding.
-    pub format: OutputFormat,
 }
 
 impl Default for Options {
@@ -64,7 +53,6 @@ impl Default for Options {
             include: Vec::new(),
             exclude: Vec::new(),
             group_file: None,
-            format: OutputFormat::Csv,
         }
     }
 }
