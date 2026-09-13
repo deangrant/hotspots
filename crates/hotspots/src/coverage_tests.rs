@@ -8,7 +8,7 @@ use crate::model::Change;
 use crate::options::{Options, TemporalPeriod};
 use crate::parse::{GitLegacyParser, GitNumstatParser, VcsParser, parser_for};
 use crate::pipeline::analyze_log;
-use crate::write_table;
+use crate::write_json;
 
 fn opts() -> Options {
     Options {
@@ -176,7 +176,7 @@ fn index_periods_and_output_control() {
     let mut table = Table::with_headers(["a"]);
     table.push_row(["\u{0001}"]);
     let mut buf = Vec::new();
-    assert!(write_table(&mut buf, &table).is_ok());
+    assert!(write_json(&mut buf, &table).is_ok());
     assert!(String::from_utf8(buf).unwrap_or_default().contains("\\u0001"));
 }
 

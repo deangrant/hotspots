@@ -10,7 +10,7 @@ use crate::error::Result;
 /// # Errors
 ///
 /// Returns an error when writing to `out` fails.
-pub fn write_table(out: &mut dyn Write, table: &Table) -> Result<()> {
+pub fn write_json(out: &mut dyn Write, table: &Table) -> Result<()> {
     writeln!(out, "[")?;
     write_rows(out, table)?;
     writeln!(out, "]")?;
@@ -115,7 +115,7 @@ mod tests {
         let mut table = Table::with_headers(["a", "b"]);
         table.push_row(["x\"y", "z"]);
         let mut buf = Vec::new();
-        let written = write_table(&mut buf, &table);
+        let written = write_json(&mut buf, &table);
         assert!(written.is_ok(), "{:?}", written.err());
         let text = String::from_utf8(buf).unwrap_or_default();
         assert!(text.contains("\\\""));
@@ -126,7 +126,7 @@ mod tests {
     fn empty_table_is_empty_array() {
         let table = Table::with_headers(["a"]);
         let mut buf = Vec::new();
-        assert!(write_table(&mut buf, &table).is_ok());
+        assert!(write_json(&mut buf, &table).is_ok());
         assert_eq!(String::from_utf8(buf).unwrap_or_default(), "[\n]\n");
     }
 
@@ -135,7 +135,7 @@ mod tests {
         let mut table = Table::with_headers(["h"]);
         table.push_row(["\\\t\r\u{0001}"]);
         let mut buf = Vec::new();
-        assert!(write_table(&mut buf, &table).is_ok());
+        assert!(write_json(&mut buf, &table).is_ok());
         let text = String::from_utf8(buf).unwrap_or_default();
         assert!(text.contains("\\\\"));
         assert!(text.contains("\\t"));
@@ -149,7 +149,7 @@ mod tests {
         table.rows.push(vec![String::from("only")]);
         table.push_row(["x", "y"]);
         let mut buf = Vec::new();
-        assert!(write_table(&mut buf, &table).is_ok());
+        assert!(write_json(&mut buf, &table).is_ok());
         let text = String::from_utf8(buf).unwrap_or_default();
         assert!(text.contains("\"b\": \"\""));
         assert!(text.contains("},"));
@@ -177,8 +177,8 @@ mod tests {
         table.push_row(["x"]);
         let mut fail = FailAfter { ok_writes: 0 };
         assert!(fail.flush().is_ok());
-        assert!(write_table(&mut fail, &table).is_err());
-        assert!(write_table(&mut FailAfter { ok_writes: 2 }, &table).is_err());
-        assert!(write_table(&mut FailAfter { ok_writes: 5 }, &table).is_err());
+        assert!(write_json(&mut fail, &table).is_err());
+        assert!(write_json(&mut FailAfter { ok_writes: 2 }, &table).is_err());
+        assert!(write_json(&mut FailAfter { ok_writes: 5 }, &table).is_err());
     }
 }

@@ -1,6 +1,6 @@
 //! Command-line argument parsing for the hotspots binary.
 
-use hotspots::{Options, TemporalPeriod, analysis_names};
+use hotspots::{Options, OutputFormat, TemporalPeriod, analysis_names};
 
 /// Parsed CLI invocation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -11,6 +11,8 @@ pub struct Args {
     pub vcs: String,
     /// Analysis options.
     pub options: Options,
+    /// stdout encoding.
+    pub format: OutputFormat,
     /// When true, print help and exit successfully.
     pub help: bool,
 }
@@ -32,6 +34,7 @@ const FLAGS: &[(&[&str], FlagHandler)] = &[
     (&["-g", "--group"], set_group),
     (&["--exclude"], set_exclude),
     (&["--include"], set_include),
+    (&["--format"], set_format),
 ];
 
 /// Parses process arguments.
@@ -55,6 +58,7 @@ fn help_args() -> Args {
         log: String::new(),
         vcs: String::new(),
         options: Options::default(),
+        format: OutputFormat::Text,
         help: true,
     }
 }
@@ -64,6 +68,7 @@ fn parse_required_args(argv: &[String]) -> Result<Args, String> {
         log: String::new(),
         vcs: String::new(),
         options: Options::default(),
+        format: OutputFormat::Text,
         help: false,
     };
     let mut index = 1;
@@ -206,6 +211,16 @@ fn set_include(
     push_string(argv, index, flag, &mut parsed.options.include)
 }
 
+fn set_format(
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    parsed.format = OutputFormat::parse(require_value(argv, index, flag)?)?;
+    Ok(index + 2)
+}
+
 fn assign_string(
     argv: &[String],
     index: usize,
@@ -289,9 +304,10 @@ Options:
   -g, --group FILE               Layer map (`prefix => layer` lines)
       --exclude PREFIX           Drop matching paths (repeatable)
       --include PREFIX           Keep only matching paths (repeatable)
+      --format text|json         Output format (default: text)
   -h, --help                     Show this help
 
-Output is a JSON array of objects on stdout.
+Default output is an aligned terminal table. Use `--format json` for scripting.
 
 Analyses:
   {analyses}
@@ -380,6 +396,15 @@ mod tests {
         let parsed = parse_args(&argv(&["-l", "log.txt", "-c", "git2"]));
         assert!(parsed.as_ref().is_ok_and(|p| p.options.analysis == "risk"));
         assert_eq!(Options::default().analysis, "risk");
+    }
+
+    #[test]
+    fn format_defaults_to_text_and_accepts_json() {
+        let defaulted = parse_args(&argv(&["-l", "log.txt", "-c", "git2"]));
+        assert!(defaulted.as_ref().is_ok_and(|p| p.format == OutputFormat::Text));
+        let json = parse_args(&argv(&["-l", "log.txt", "-c", "git2", "--format", "json"]));
+        assert!(json.as_ref().is_ok_and(|p| p.format == OutputFormat::Json));
+        assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "--format", "csv"])).is_err());
     }
 
     #[test]

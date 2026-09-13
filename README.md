@@ -1,9 +1,9 @@
 # hotspots
 
 Command-line tool that mines **exported Git history logs** and prints
-**JSON** maintenance metrics. By default it ranks files by a composite
-**risk** score (0–100 within the current log) from revisions, churn, SOC, and
-ownership fragmentation.
+maintenance metrics. By default it ranks files by a composite **risk** score
+(0–100 within the current log) from revisions, churn, SOC, and ownership
+fragmentation, shown as an **aligned terminal table**.
 
 Metrics are **indicators**, not blame or defect probability. High scores mean
 “investigate,” not “this will fail.”
@@ -15,8 +15,8 @@ cargo build -p hotspots-cli --release
 cargo run -p hotspots-cli -- -l logfile.log -c git2 -n 1
 ```
 
-Omitting `-a` runs the default **risk** analysis. Results are a JSON array of
-objects on stdout.
+Omitting `-a` runs the default **risk** analysis. Omitting `--format` prints a
+terminal table. Use `--format json` for a JSON array of objects.
 
 ## Generate a Git log
 
@@ -40,8 +40,11 @@ Prefer `--no-renames` so paths stay comparable across commits. Limit history wit
 ## Examples
 
 ```bash
-# Default: relative risk ranking (0–100 within this log)
+# Default: relative risk ranking as a terminal table
 cargo run -p hotspots-cli -- -l logfile.log -c git2 -n 1 -r 20
+
+# Same results as JSON for scripting
+cargo run -p hotspots-cli -- -l logfile.log -c git2 -n 1 -r 20 --format json
 
 # Authors per entity
 cargo run -p hotspots-cli -- -l logfile.log -c git2 -a authors -n 5
@@ -53,7 +56,7 @@ cargo run -p hotspots-cli -- -l logfile.log -c git2 -a coupling
 cargo run -p hotspots-cli -- -l logfile.log -c git2 -a revisions \
   --exclude vendor --exclude node_modules
 
-# Summary as JSON on stdout
+# Summary
 cargo run -p hotspots-cli -- -l logfile.log -c git2 -a summary
 ```
 
@@ -61,7 +64,7 @@ See `hotspots --help` for the full flag and analysis list.
 
 ## Workspace
 
-- `crates/hotspots` — library (parsers, filters, metrics, JSON writer)
+- `crates/hotspots` — library (parsers, filters, metrics, text/JSON writers)
 - `crates/hotspots-cli` — thin CLI composition root
 
 Dependencies are intentionally limited to the Rust standard library.

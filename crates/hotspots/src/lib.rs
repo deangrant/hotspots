@@ -28,6 +28,6 @@ pub use model::Change;
 #[doc(inline)]
 pub use options::{Options, TemporalPeriod};
 #[doc(inline)]
-pub use output::write_table;
+pub use output::{OutputFormat, write_json, write_table, write_text};
 #[doc(inline)]
 pub use pipeline::analyze_log;

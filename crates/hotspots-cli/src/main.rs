@@ -54,7 +54,7 @@ fn execute(parsed: &Args) -> Result<(), String> {
     let table =
         analyze_log(&mut reader, &parsed.vcs, &parsed.options).map_err(|e| e.to_string())?;
     let mut stdout = io::stdout().lock();
-    write_table(&mut stdout, &table).map_err(|e| e.to_string())?;
+    write_table(&mut stdout, &table, parsed.format).map_err(|e| e.to_string())?;
     Ok(())
 }
 
