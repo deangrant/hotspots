@@ -46,6 +46,8 @@ Prefer `--no-renames` so paths stay comparable across commits. Limit history wit
 Revisions in the log must exist in `--repo`. Attribution uses **per-commit**
 symbol tables (`git show REV:PATH`) and **zero-context hunk overlap**
 (`git show`/`diff-tree -U0`), not a HEAD-only map applied to numstat totals.
+Deleted or renamed-away paths load symbols from the parent blob (`REV^:PATH`);
+missing on both sides still fails closed.
 
 Non-Rust paths are **dropped** under function grain (a stderr note reports the
 count). Use `--include` to restrict the log to Rust trees when mixed languages

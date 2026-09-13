@@ -54,10 +54,7 @@ fn rust_keys(changes: &[Change]) -> BTreeSet<(String, String)> {
 }
 
 fn build_file_diff(git: &dyn GitRunner, repo: &Path, rev: &str, path: &str) -> Result<FileDiff> {
-    let new_src = show_blob(git, repo, rev, path)
-        .map_err(|e| Error::msg(format!("cannot load `{path}` at `{rev}`: {e}")))?;
-    let symbols_new = symbols_from_source(path, &new_src)?;
-    let symbols_old = load_old_symbols(git, repo, rev, path)?;
+    let (symbols_new, symbols_old) = load_symbol_sides(git, repo, rev, path)?;
     let unified = show_hunks(git, repo, rev, path)
         .map_err(|e| Error::msg(format!("cannot load hunks for `{path}` at `{rev}`: {e}")))?;
     let hunks = parse_hunks(&unified);
@@ -71,6 +68,45 @@ fn build_file_diff(git: &dyn GitRunner, repo: &Path, rev: &str, path: &str) -> R
         symbols_old,
         hunks,
     })
+}
+
+/// Loads new/old symbol tables, falling back to parent-only for deletes.
+fn load_symbol_sides(
+    git: &dyn GitRunner,
+    repo: &Path,
+    rev: &str,
+    path: &str,
+) -> Result<(
+    Vec<hotspots::symbols::SymbolFact>,
+    Vec<hotspots::symbols::SymbolFact>,
+)> {
+    match show_blob(git, repo, rev, path) {
+        Ok(new_src) => {
+            let symbols_new = symbols_from_source(path, &new_src)?;
+            let symbols_old = load_old_symbols(git, repo, rev, path)?;
+            Ok((symbols_new, symbols_old))
+        }
+        Err(_) => load_delete_only_symbols(git, repo, rev, path),
+    }
+}
+
+fn load_delete_only_symbols(
+    git: &dyn GitRunner,
+    repo: &Path,
+    rev: &str,
+    path: &str,
+) -> Result<(
+    Vec<hotspots::symbols::SymbolFact>,
+    Vec<hotspots::symbols::SymbolFact>,
+)> {
+    let parent = format!("{rev}^");
+    let old_src = show_blob(git, repo, &parent, path).map_err(|e| {
+        Error::msg(format!(
+            "cannot load `{path}` at `{rev}` or `{parent}`: {e}"
+        ))
+    })?;
+    let symbols_old = symbols_from_source(path, &old_src)?;
+    Ok((Vec::new(), symbols_old))
 }
 
 fn load_old_symbols(
@@ -171,5 +207,36 @@ mod tests {
             Some(0),
         )];
         assert!(resolver.expand(&changes, &PathBuf::from("/tmp")).is_err());
+    }
+
+    #[test]
+    fn expands_delete_only_via_parent_blob() {
+        let old_src = "fn alpha() {}\nfn beta() {}\n";
+        let patch = "@@ -1,2 +0,0 @@\n-fn alpha() {}\n-fn beta() {}\n";
+        let mut ok = HashMap::new();
+        ok.insert(
+            String::from("rev-parse --is-inside-work-tree"),
+            String::from("true\n"),
+        );
+        ok.insert(String::from("show abc^:a.rs"), String::from(old_src));
+        ok.insert(
+            String::from("diff-tree -U0 abc^ abc -- a.rs"),
+            String::from(patch),
+        );
+        let mut err = HashMap::new();
+        err.insert(String::from("show abc:a.rs"), String::from("missing"));
+        let resolver = RustGitSynResolver::with_git(MapGit { ok, err });
+        let changes = [Change::new(
+            "abc",
+            "Ada",
+            "2024-01-01",
+            "a.rs",
+            Some(0),
+            Some(2),
+        )];
+        let expanded = resolver.expand(&changes, Path::new("/repo"));
+        assert!(expanded.as_ref().is_ok_and(|(rows, _)| {
+            rows.iter().any(|c| c.entity == "a.rs::alpha" && c.deleted == Some(1))
+        }));
     }
 }

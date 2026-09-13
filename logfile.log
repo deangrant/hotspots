@@ -1,3 +1,45 @@
+--f2bcca9--2026-09-13--Dean Grant
+45	0	Cargo.lock
+1	1	Cargo.toml
+25	3	README.md
+1	0	crates/hotspots-cli/Cargo.toml
+41	1	crates/hotspots-cli/src/args.rs
+46	3	crates/hotspots-cli/src/main.rs
+18	0	crates/hotspots-rs/Cargo.toml
+64	0	crates/hotspots-rs/src/diff.rs
+77	0	crates/hotspots-rs/src/git.rs
+10	0	crates/hotspots-rs/src/lib.rs
+113	0	crates/hotspots-rs/src/parse.rs
+175	0	crates/hotspots-rs/src/resolve.rs
+5	2	crates/hotspots/src/lib.rs
+38	1	crates/hotspots/src/options.rs
+27	6	crates/hotspots/src/pipeline.rs
+204	0	crates/hotspots/src/symbols/expand.rs
+89	0	crates/hotspots/src/symbols/mod.rs
+76	0	crates/hotspots/src/symbols/types.rs
+
+--43ee81a--2026-09-13--Dean Grant
+11	8	README.md
+27	2	crates/hotspots-cli/src/args.rs
+1	1	crates/hotspots-cli/src/main.rs
+2	2	crates/hotspots/src/coverage_tests.rs
+1	1	crates/hotspots/src/lib.rs
+0	184	crates/hotspots/src/output.rs
+184	0	crates/hotspots/src/output/json.rs
+75	0	crates/hotspots/src/output/mod.rs
+121	0	crates/hotspots/src/output/text.rs
+
+--08ddfab--2026-09-13--Dean Grant
+11	7	README.md
+8	1	crates/hotspots-cli/src/args.rs
+11	0	crates/hotspots/src/analysis/effort.rs
+5	0	crates/hotspots/src/analysis/hotspots.rs
+3	0	crates/hotspots/src/analysis/mod.rs
+274	0	crates/hotspots/src/analysis/risk.rs
+6	0	crates/hotspots/src/analysis/soc.rs
+1	1	crates/hotspots/src/options.rs
+145	0	logfile.log
+
 --de1910a--2026-09-13--Dean Grant
 244	47	crates/hotspots-cli/src/args.rs
 95	12	crates/hotspots-cli/src/main.rs
