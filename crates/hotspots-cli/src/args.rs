@@ -55,28 +55,27 @@ fn parse_flag(
         "-c" | "--vcs" => assign_string(argv, index, flag, &mut parsed.vcs),
         "-a" | "--analysis" => assign_string(argv, index, flag, &mut parsed.options.analysis),
         "-r" | "--rows" => {
-            parsed.options.rows = Some(parse_usize(require_value(argv, index, flag)?, flag)?);
+            parsed.options.rows = Some(parse_int(require_value(argv, index, flag)?, flag)?);
             Ok(index + 2)
         }
         "-n" | "--min-revs" => {
-            parsed.options.min_revs = parse_u64(require_value(argv, index, flag)?, flag)?;
+            parsed.options.min_revs = parse_int(require_value(argv, index, flag)?, flag)?;
             Ok(index + 2)
         }
         "-m" | "--min-shared-revs" => {
-            parsed.options.min_shared_revs = parse_u64(require_value(argv, index, flag)?, flag)?;
+            parsed.options.min_shared_revs = parse_int(require_value(argv, index, flag)?, flag)?;
             Ok(index + 2)
         }
         "-i" | "--min-coupling" => {
-            parsed.options.min_coupling = parse_u64(require_value(argv, index, flag)?, flag)?;
+            parsed.options.min_coupling = parse_int(require_value(argv, index, flag)?, flag)?;
             Ok(index + 2)
         }
         "-x" | "--max-coupling" => {
-            parsed.options.max_coupling = parse_u64(require_value(argv, index, flag)?, flag)?;
+            parsed.options.max_coupling = parse_int(require_value(argv, index, flag)?, flag)?;
             Ok(index + 2)
         }
         "-s" | "--max-changeset-size" => {
-            parsed.options.max_changeset_size =
-                parse_usize(require_value(argv, index, flag)?, flag)?;
+            parsed.options.max_changeset_size = parse_int(require_value(argv, index, flag)?, flag)?;
             Ok(index + 2)
         }
         "-d" | "--age-time-now" => {
@@ -129,12 +128,8 @@ fn require_value<'a>(argv: &'a [String], index: usize, flag: &str) -> Result<&'a
         .ok_or_else(|| format!("missing value for `{flag}`"))
 }
 
-fn parse_u64(raw: &str, flag: &str) -> Result<u64, String> {
-    raw.parse::<u64>().map_err(|_| format!("invalid integer for `{flag}`: {raw}"))
-}
-
-fn parse_usize(raw: &str, flag: &str) -> Result<usize, String> {
-    raw.parse::<usize>().map_err(|_| format!("invalid integer for `{flag}`: {raw}"))
+fn parse_int<T: std::str::FromStr>(raw: &str, flag: &str) -> Result<T, String> {
+    raw.parse().map_err(|_| format!("invalid integer for `{flag}`: {raw}"))
 }
 
 fn parse_temporal(raw: &str) -> Result<TemporalPeriod, String> {

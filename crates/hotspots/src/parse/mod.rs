@@ -68,6 +68,42 @@ fn split_numstat_line(line: &str) -> Result<Option<(u64, u64, String)>> {
     Ok(Some((added, deleted, path.to_owned())))
 }
 
+/// Shared header identity: revision, author, and date.
+type CommitHeader = (String, String, String);
+
+/// Parses a numstat log stream using a format-specific header recognizer.
+///
+/// The header callback returns `(rev, author, date)` when a commit header is
+/// recognized.
+fn parse_numstat_stream(
+    input: &mut dyn BufRead,
+    parse_header: impl Fn(&str) -> Result<Option<CommitHeader>>,
+) -> Result<Vec<Change>> {
+    let mut changes = Vec::new();
+    let mut current: Option<CommitHeader> = None;
+    let mut line = String::new();
+    loop {
+        line.clear();
+        let read = input.read_line(&mut line)?;
+        if read == 0 {
+            break;
+        }
+        let trimmed = line.trim_end_matches(['\r', '\n']);
+        if let Some(header) = parse_header(trimmed)? {
+            current = Some(header);
+            continue;
+        }
+        let Some((rev, author, date)) = current.as_ref() else {
+            if trimmed.is_empty() {
+                continue;
+            }
+            return Err(Error::msg(format!("numstat line before header: {trimmed}")));
+        };
+        push_numstat_change(&mut changes, rev, author, date, trimmed)?;
+    }
+    Ok(changes)
+}
+
 fn push_numstat_change(
     out: &mut Vec<Change>,
     rev: &str,

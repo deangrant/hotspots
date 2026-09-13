@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::analysis::table::Table;
-use crate::analysis::util::{entity_revisions, fmt_u64, meets_min_revs};
+use crate::analysis::util::{entity_revisions, fmt_u64, meets_min_revs, ordered_pair};
 use crate::index::ChangesetIndex;
 use crate::model::Change;
 use crate::options::Options;
@@ -68,12 +68,4 @@ fn pair_shared_counts(
         }
     }
     shared
-}
-
-fn ordered_pair(left: &str, right: &str) -> (String, String) {
-    if left <= right {
-        (left.to_owned(), right.to_owned())
-    } else {
-        (right.to_owned(), left.to_owned())
-    }
 }

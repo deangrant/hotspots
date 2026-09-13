@@ -4,7 +4,7 @@ use std::io::BufRead;
 
 use crate::error::{Error, Result};
 use crate::model::Change;
-use crate::parse::{VcsParser, push_numstat_change};
+use crate::parse::{VcsParser, parse_numstat_stream};
 
 /// Parser for the legacy bracketed Git log format.
 #[derive(Debug, Clone, Copy, Default)]
@@ -12,46 +12,11 @@ pub struct GitLegacyParser;
 
 impl VcsParser for GitLegacyParser {
     fn parse(&self, input: &mut dyn BufRead) -> Result<Vec<Change>> {
-        let mut changes = Vec::new();
-        let mut current: Option<Header> = None;
-        let mut line = String::new();
-        loop {
-            line.clear();
-            let read = input.read_line(&mut line)?;
-            if read == 0 {
-                break;
-            }
-            let trimmed = line.trim_end_matches(['\r', '\n']);
-            if let Some(header) = parse_header(trimmed)? {
-                current = Some(header);
-                continue;
-            }
-            let Some(header) = current.as_ref() else {
-                if trimmed.is_empty() {
-                    continue;
-                }
-                return Err(Error::msg(format!("numstat line before header: {trimmed}")));
-            };
-            push_numstat_change(
-                &mut changes,
-                &header.rev,
-                &header.author,
-                &header.date,
-                trimmed,
-            )?;
-        }
-        Ok(changes)
+        parse_numstat_stream(input, parse_header)
     }
 }
 
-#[derive(Debug)]
-struct Header {
-    rev: String,
-    author: String,
-    date: String,
-}
-
-fn parse_header(line: &str) -> Result<Option<Header>> {
+fn parse_header(line: &str) -> Result<Option<(String, String, String)>> {
     if !line.starts_with('[') {
         return Ok(None);
     }
@@ -70,11 +35,7 @@ fn parse_header(line: &str) -> Result<Option<Header>> {
         return Err(Error::msg(format!("legacy header missing author: {line}")));
     }
     let date = &rest[date_at..date_at + 10];
-    Ok(Some(Header {
-        rev: rev.to_owned(),
-        author: author.to_owned(),
-        date: date.to_owned(),
-    }))
+    Ok(Some((rev.to_owned(), author.to_owned(), date.to_owned())))
 }
 
 fn find_iso_date(text: &str) -> Option<usize> {

@@ -97,3 +97,28 @@ pub fn fmt_u64(value: u64) -> String {
 pub fn fmt_pct(value: f64) -> String {
     format!("{value:.2}")
 }
+
+/// Returns `(left, right)` ordered lexicographically for stable pair keys.
+#[must_use]
+pub fn ordered_pair(left: &str, right: &str) -> (String, String) {
+    if left <= right {
+        (left.to_owned(), right.to_owned())
+    } else {
+        (right.to_owned(), left.to_owned())
+    }
+}
+
+/// Computes `100 * numerator / denominator` for display percentages.
+#[must_use]
+pub fn percent(numerator: u64, denominator: u64) -> f64 {
+    if denominator == 0 {
+        return 0.0;
+    }
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "display-only ownership percentage"
+    )]
+    {
+        (numerator as f64) * 100.0 / (denominator as f64)
+    }
+}

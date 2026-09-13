@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::analysis::table::Table;
-use crate::analysis::util::{count_as_u64, fmt_pct, fmt_u64, meets_min_revs};
+use crate::analysis::util::{count_as_u64, fmt_pct, fmt_u64, meets_min_revs, percent};
 use crate::model::Change;
 use crate::options::Options;
 
@@ -113,19 +113,6 @@ fn fragmentation_score(authors: &BTreeMap<String, BTreeSet<String>>, total: u64)
         sum_sq += share * share;
     }
     1.0 - sum_sq
-}
-
-fn percent(numerator: u64, denominator: u64) -> f64 {
-    if denominator == 0 {
-        return 0.0;
-    }
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "display-only ownership percentage"
-    )]
-    {
-        (numerator as f64) * 100.0 / (denominator as f64)
-    }
 }
 
 fn cmp_f64_desc(left: f64, right: f64) -> Ordering {

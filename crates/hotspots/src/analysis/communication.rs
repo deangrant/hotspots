@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::analysis::table::Table;
-use crate::analysis::util::{entity_authors, fmt_u64};
+use crate::analysis::util::{entity_authors, fmt_u64, ordered_pair};
 use crate::model::Change;
 use crate::options::Options;
 
@@ -28,14 +28,6 @@ pub fn run(changes: &[Change], opts: &Options) -> Table {
         table.push_row([author, peer, fmt_u64(count)]);
     }
     table.limit(opts.rows)
-}
-
-fn ordered_pair(left: &str, right: &str) -> (String, String) {
-    if left <= right {
-        (left.to_owned(), right.to_owned())
-    } else {
-        (right.to_owned(), left.to_owned())
-    }
 }
 
 #[cfg(test)]

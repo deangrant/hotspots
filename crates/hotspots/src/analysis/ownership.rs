@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::analysis::table::Table;
-use crate::analysis::util::{fmt_pct, fmt_u64, require_churn};
+use crate::analysis::util::{fmt_pct, fmt_u64, percent, require_churn};
 use crate::error::Result;
 use crate::model::Change;
 use crate::options::Options;
@@ -70,17 +70,4 @@ fn flatten_churn(map: EntityAuthorChurn) -> Vec<(String, String, u64, u64)> {
         }
     }
     rows
-}
-
-fn percent(numerator: u64, denominator: u64) -> f64 {
-    if denominator == 0 {
-        return 0.0;
-    }
-    #[expect(
-        clippy::cast_precision_loss,
-        reason = "display-only ownership percentage"
-    )]
-    {
-        (numerator as f64) * 100.0 / (denominator as f64)
-    }
 }
