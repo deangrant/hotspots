@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use hotspots::symbols::SymbolFact;
 use syn::spanned::Spanned;
-use syn::{ImplItem, Item};
+use syn::{ImplItem, Item, TraitItem};
 
 /// Parses Rust source into symbol facts for `path`.
 ///
@@ -27,6 +27,7 @@ fn collect_items(path: &str, prefix: &str, items: &[Item], facts: &mut Vec<Symbo
                 facts.push(fact(path, &name, func.span()));
             }
             Item::Impl(imp) => collect_impl(path, prefix, imp, facts),
+            Item::Trait(tr) => collect_trait(path, prefix, tr, facts),
             Item::Mod(module) => {
                 if let Some((_, items)) = &module.content {
                     let child = qualify(prefix, &module.ident.to_string());
@@ -42,6 +43,17 @@ fn collect_impl(path: &str, prefix: &str, imp: &syn::ItemImpl, facts: &mut Vec<S
     for item in &imp.items {
         if let ImplItem::Fn(method) = item {
             let base = method_base_name(imp, &method.sig.ident.to_string());
+            let name = qualify(prefix, &base);
+            facts.push(fact(path, &name, method.span()));
+        }
+    }
+}
+
+fn collect_trait(path: &str, prefix: &str, tr: &syn::ItemTrait, facts: &mut Vec<SymbolFact>) {
+    let trait_name = tr.ident.to_string();
+    for item in &tr.items {
+        if let TraitItem::Fn(method) = item {
+            let base = format!("{trait_name}::{}", method.sig.ident);
             let name = qualify(prefix, &base);
             facts.push(fact(path, &name, method.span()));
         }
@@ -159,6 +171,14 @@ impl TraitB for Foo { fn m(&self) {} }
         let first = facts.iter().find(|f| f.name == "twin#1");
         let second = facts.iter().find(|f| f.name == "twin#2");
         assert!(first.is_some_and(|f| f.start_line < second.map_or(0, |s| s.start_line)));
+    }
+
+    #[test]
+    fn extracts_trait_methods() {
+        let src = "trait Foo { fn bar(&self); }\nmod a { trait Baz { fn qux(&self); } }\n";
+        let facts = symbols_from_source("a.rs", src).unwrap_or_default();
+        assert!(facts.iter().any(|f| f.name == "Foo::bar"));
+        assert!(facts.iter().any(|f| f.name == "a::Baz::qux"));
     }
 
     #[test]

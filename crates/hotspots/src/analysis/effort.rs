@@ -107,7 +107,7 @@ fn fragmentation_score(authors: &BTreeMap<String, BTreeSet<String>>, total: u64)
         let share = percent(count_as_u64(revs.len()), total) / 100.0;
         sum_sq += share * share;
     }
-    1.0 - sum_sq
+    (1.0 - sum_sq) * 100.0
 }
 
 /// Fragmentation score per entity (unfiltered).
@@ -151,5 +151,34 @@ mod tests {
             Some((String::from("Bea"), 2))
         );
         assert!(fragmentation_score(&authors, 3) > 0.0);
+    }
+
+    #[test]
+    fn fragmentation_displays_on_percent_scale() {
+        let sole = {
+            let mut authors = BTreeMap::new();
+            authors.insert(String::from("Ada"), BTreeSet::from([String::from("1")]));
+            fragmentation_score(&authors, 1)
+        };
+        assert!((sole - 0.0).abs() < f64::EPSILON);
+
+        let equal = {
+            let mut authors = BTreeMap::new();
+            authors.insert(String::from("Ada"), BTreeSet::from([String::from("1")]));
+            authors.insert(String::from("Bea"), BTreeSet::from([String::from("2")]));
+            fragmentation_score(&authors, 2)
+        };
+        assert!((equal - 50.0).abs() < f64::EPSILON);
+
+        let changes = [
+            Change::new("1", "Ada", "2024-01-01", "a.rs", None, None),
+            Change::new("2", "Bea", "2024-01-02", "a.rs", None, None),
+        ];
+        let opts = Options {
+            min_revs: 1,
+            ..Options::default()
+        };
+        let table = fragmentation(&changes, &opts);
+        assert_eq!(table.rows[0][1], "50.00");
     }
 }

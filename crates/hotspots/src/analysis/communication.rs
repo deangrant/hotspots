@@ -3,15 +3,21 @@
 use std::collections::BTreeMap;
 
 use crate::analysis::table::Table;
-use crate::analysis::util::{entity_authors, fmt_u64, ordered_pair};
+use crate::analysis::util::{
+    entity_authors, entity_revisions, fmt_u64, meets_min_revs, ordered_pair,
+};
 use crate::model::Change;
 use crate::options::Options;
 
 /// Counts how many entities pairs of authors both touched.
 pub fn run(changes: &[Change], opts: &Options) -> Table {
+    let revs = entity_revisions(changes);
     let authors_by_entity = entity_authors(changes);
     let mut shared: BTreeMap<(String, String), u64> = BTreeMap::new();
-    for authors in authors_by_entity.values() {
+    for (entity, authors) in &authors_by_entity {
+        if !meets_min_revs(revs.get(entity).copied().unwrap_or(0), opts) {
+            continue;
+        }
         let list: Vec<&String> = authors.iter().collect();
         for i in 0..list.len() {
             for j in (i + 1)..list.len() {
@@ -59,5 +65,23 @@ mod tests {
             ..Options::default()
         };
         assert!(run(&changes, &opts).rows.is_empty());
+    }
+
+    #[test]
+    fn ignores_entities_below_min_revs() {
+        let changes = vec![
+            Change::new("1", "Ada", "2024-01-01", "hot.rs", None, None),
+            Change::new("2", "Bea", "2024-01-02", "hot.rs", None, None),
+            Change::new("3", "Ada", "2024-01-03", "cold.rs", None, None),
+            Change::new("4", "Bea", "2024-01-04", "cold.rs", None, None),
+            Change::new("5", "Ada", "2024-01-05", "hot.rs", None, None),
+        ];
+        let opts = Options {
+            min_revs: 3,
+            ..Options::default()
+        };
+        let table = run(&changes, &opts);
+        assert_eq!(table.rows.len(), 1);
+        assert_eq!(table.rows[0][2], "1");
     }
 }

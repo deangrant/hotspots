@@ -1,6 +1,6 @@
 //! `SymbolResolver` implementation using Git and `syn`.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 
 use hotspots::symbols::{ExpandStats, FileDiff, SymbolResolver, expand_with_diffs, is_rust_path};
@@ -38,9 +38,10 @@ impl<G: GitRunner> SymbolResolver for RustGitSynResolver<G> {
     fn expand(&self, changes: &[Change], repo: &Path) -> Result<(Vec<Change>, ExpandStats)> {
         ensure_work_tree(&self.git, repo)?;
         let keys = rust_keys(changes);
+        let mut cache = BlobCache::new(&self.git, repo);
         let mut diffs = BTreeMap::new();
         for (rev, path) in keys {
-            let diff = build_file_diff(&self.git, repo, &rev, &path)?;
+            let diff = build_file_diff(&mut cache, &rev, &path)?;
             diffs.insert((rev, path), diff);
         }
         expand_with_diffs(changes, &diffs)
@@ -55,9 +56,42 @@ fn rust_keys(changes: &[Change]) -> BTreeSet<(String, String)> {
         .collect()
 }
 
-fn build_file_diff(git: &dyn GitRunner, repo: &Path, rev: &str, path: &str) -> Result<FileDiff> {
-    let (symbols_new, symbols_old) = load_symbol_sides(git, repo, rev, path)?;
-    let unified = show_hunks(git, repo, rev, path)
+struct BlobCache<'a> {
+    git: &'a dyn GitRunner,
+    repo: &'a Path,
+    blobs: HashMap<(String, String), std::result::Result<String, String>>,
+}
+
+impl<'a> BlobCache<'a> {
+    fn new(git: &'a dyn GitRunner, repo: &'a Path) -> Self {
+        Self {
+            git,
+            repo,
+            blobs: HashMap::new(),
+        }
+    }
+
+    fn show(&mut self, rev: &str, path: &str) -> Result<String> {
+        let key = (rev.to_owned(), path.to_owned());
+        if let Some(cached) = self.blobs.get(&key) {
+            return match cached {
+                Ok(src) => Ok(src.clone()),
+                Err(msg) => Err(Error::msg(msg.clone())),
+            };
+        }
+        let result = show_blob(self.git, self.repo, rev, path);
+        let stored = match &result {
+            Ok(src) => Ok(src.clone()),
+            Err(err) => Err(err.to_string()),
+        };
+        self.blobs.insert(key, stored);
+        result
+    }
+}
+
+fn build_file_diff(cache: &mut BlobCache<'_>, rev: &str, path: &str) -> Result<FileDiff> {
+    let (symbols_new, symbols_old) = load_symbol_sides(cache, rev, path)?;
+    let unified = show_hunks(cache.git, cache.repo, rev, path)
         .map_err(|e| Error::msg(format!("cannot load hunks for `{path}` at `{rev}`: {e}")))?;
     let hunks = parse_hunks(&unified);
     if hunks.is_empty() {
@@ -74,28 +108,26 @@ fn build_file_diff(git: &dyn GitRunner, repo: &Path, rev: &str, path: &str) -> R
 
 /// Loads new/old symbol tables, falling back to parent-only for deletes.
 fn load_symbol_sides(
-    git: &dyn GitRunner,
-    repo: &Path,
+    cache: &mut BlobCache<'_>,
     rev: &str,
     path: &str,
 ) -> Result<(
     Vec<hotspots::symbols::SymbolFact>,
     Vec<hotspots::symbols::SymbolFact>,
 )> {
-    match show_blob(git, repo, rev, path) {
+    match cache.show(rev, path) {
         Ok(new_src) => {
             let symbols_new = symbols_from_source(path, &new_src)?;
-            let symbols_old = load_old_symbols(git, repo, rev, path)?;
+            let symbols_old = load_old_symbols(cache, rev, path)?;
             Ok((symbols_new, symbols_old))
         }
-        Err(e) if is_missing_path_error(&e) => load_delete_only_symbols(git, repo, rev, path),
+        Err(e) if is_missing_path_error(&e) => load_delete_only_symbols(cache, rev, path),
         Err(e) => Err(Error::msg(format!("cannot load `{path}` at `{rev}`: {e}"))),
     }
 }
 
 fn load_delete_only_symbols(
-    git: &dyn GitRunner,
-    repo: &Path,
+    cache: &mut BlobCache<'_>,
     rev: &str,
     path: &str,
 ) -> Result<(
@@ -103,7 +135,7 @@ fn load_delete_only_symbols(
     Vec<hotspots::symbols::SymbolFact>,
 )> {
     let parent = format!("{rev}^");
-    let old_src = show_blob(git, repo, &parent, path).map_err(|e| {
+    let old_src = cache.show(&parent, path).map_err(|e| {
         Error::msg(format!(
             "cannot load `{path}` at `{rev}` or `{parent}`: {e}"
         ))
@@ -113,13 +145,12 @@ fn load_delete_only_symbols(
 }
 
 fn load_old_symbols(
-    git: &dyn GitRunner,
-    repo: &Path,
+    cache: &mut BlobCache<'_>,
     rev: &str,
     path: &str,
 ) -> Result<Vec<hotspots::symbols::SymbolFact>> {
     let parent = format!("{rev}^");
-    let Ok(src) = show_blob(git, repo, &parent, path) else {
+    let Ok(src) = cache.show(&parent, path) else {
         return Ok(Vec::new());
     };
     symbols_from_source(path, &src)
@@ -128,6 +159,7 @@ fn load_old_symbols(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::Cell;
     use std::collections::HashMap;
     use std::path::PathBuf;
 
@@ -150,6 +182,20 @@ mod tests {
                 return Err(Error::msg(msg.clone()));
             }
             Err(Error::msg(format!("unexpected git args: {key}")))
+        }
+    }
+
+    struct CountingGit {
+        inner: MapGit,
+        shows: Cell<usize>,
+    }
+
+    impl GitRunner for CountingGit {
+        fn run(&self, repo: &Path, args: &[&str]) -> Result<String> {
+            if args.first() == Some(&"show") && args.len() == 2 && args[1].contains(':') {
+                self.shows.set(self.shows.get() + 1);
+            }
+            self.inner.run(repo, args)
         }
     }
 
@@ -268,5 +314,48 @@ mod tests {
         )];
         let expanded = resolver.expand(&changes, Path::new("/repo"));
         assert!(expanded.is_err());
+    }
+
+    #[test]
+    fn blob_cache_reuses_shared_rev_path() {
+        let src = "fn alpha() {}\n";
+        let patch = "@@ -0,0 +1,1 @@\n+fn alpha() {}\n";
+        let mut ok = HashMap::new();
+        ok.insert(
+            String::from("rev-parse --is-inside-work-tree"),
+            String::from("true\n"),
+        );
+        ok.insert(String::from("show base:a.rs"), String::from(src));
+        ok.insert(String::from("show base^:a.rs"), String::from(src));
+        ok.insert(
+            String::from("show -U0 --format= base -- a.rs"),
+            String::from(patch),
+        );
+        ok.insert(
+            String::from("show -U0 --format= base^ -- a.rs"),
+            String::from(patch),
+        );
+        let mut err = HashMap::new();
+        err.insert(
+            String::from("diff-tree -U0 base^ base -- a.rs"),
+            String::from("no parent"),
+        );
+        err.insert(
+            String::from("diff-tree -U0 base^^ base^ -- a.rs"),
+            String::from("no parent"),
+        );
+        err.insert(String::from("show base^^:a.rs"), String::from("missing"));
+        let git = CountingGit {
+            inner: MapGit { ok, err },
+            shows: Cell::new(0),
+        };
+        let resolver = RustGitSynResolver::with_git(git);
+        let changes = [
+            Change::new("base", "Ada", "2024-01-01", "a.rs", Some(1), Some(0)),
+            Change::new("base^", "Ada", "2024-01-02", "a.rs", Some(1), Some(0)),
+        ];
+        assert!(resolver.expand(&changes, Path::new("/repo")).is_ok());
+        // Unique blob keys: base:a.rs, base^:a.rs, base^^:a.rs — base^:a.rs shared.
+        assert_eq!(resolver.git.shows.get(), 3);
     }
 }

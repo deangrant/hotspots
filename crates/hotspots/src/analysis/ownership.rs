@@ -3,7 +3,9 @@
 use std::collections::BTreeMap;
 
 use crate::analysis::table::Table;
-use crate::analysis::util::{fmt_pct, fmt_u64, percent, require_churn};
+use crate::analysis::util::{
+    entity_revisions, fmt_pct, fmt_u64, meets_min_revs, percent, require_churn,
+};
 use crate::error::Result;
 use crate::model::Change;
 use crate::options::Options;
@@ -13,9 +15,11 @@ type EntityAuthorChurn = BTreeMap<String, BTreeMap<String, (u64, u64)>>;
 /// Reports added and deleted lines per entity and author.
 pub fn entity_ownership(changes: &[Change], opts: &Options) -> Result<Table> {
     require_churn(changes)?;
+    let revs = entity_revisions(changes);
     let map = collect_churn(changes);
     let mut table = Table::with_headers(["entity", "author", "added", "deleted"]);
     let mut rows = flatten_churn(map);
+    rows.retain(|(entity, _, _, _)| meets_min_revs(revs.get(entity).copied().unwrap_or(0), opts));
     rows.sort_by(|a, b| a.0.cmp(&b.0).then(b.2.cmp(&a.2)).then(a.1.cmp(&b.1)));
     for (entity, author, added, deleted) in rows {
         table.push_row([entity, author, fmt_u64(added), fmt_u64(deleted)]);
@@ -26,9 +30,13 @@ pub fn entity_ownership(changes: &[Change], opts: &Options) -> Result<Table> {
 /// Identifies the main developer by added lines for each entity.
 pub fn main_dev(changes: &[Change], opts: &Options) -> Result<Table> {
     require_churn(changes)?;
+    let revs = entity_revisions(changes);
     let map = collect_churn(changes);
     let mut rows = Vec::new();
     for (entity, authors) in map {
+        if !meets_min_revs(revs.get(&entity).copied().unwrap_or(0), opts) {
+            continue;
+        }
         let total_added: u64 = authors.values().map(|(a, _)| *a).sum();
         if let Some((author, added)) = leading_author_by_added(authors) {
             let ownership = percent(added, total_added);
@@ -89,5 +97,23 @@ mod tests {
             leading_author_by_added(authors),
             Some((String::from("Bea"), 5))
         );
+    }
+
+    #[test]
+    fn ownership_respects_min_revs() {
+        let changes = [
+            Change::new("1", "Ada", "2024-01-01", "a.rs", Some(3), Some(0)),
+            Change::new("2", "Ada", "2024-01-02", "a.rs", Some(1), Some(0)),
+            Change::new("3", "Ada", "2024-01-03", "b.rs", Some(9), Some(0)),
+        ];
+        let opts = Options {
+            min_revs: 2,
+            ..Options::default()
+        };
+        let table = entity_ownership(&changes, &opts).unwrap_or_default();
+        assert!(table.rows.iter().all(|row| row[0] == "a.rs"));
+        let mains = main_dev(&changes, &opts).unwrap_or_default();
+        assert_eq!(mains.rows.len(), 1);
+        assert_eq!(mains.rows[0][0], "a.rs");
     }
 }

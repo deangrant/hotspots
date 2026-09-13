@@ -20,7 +20,7 @@ pub fn abs_churn(changes: &[Change], opts: &Options) -> Result<Table> {
         entry.1 += change.deleted.unwrap_or(0);
     }
     let mut table = Table::with_headers(["date", "added", "deleted"]);
-    for (date, (added, deleted)) in by_date {
+    for (date, (added, deleted)) in by_date.into_iter().rev() {
         table.push_row([date, fmt_u64(added), fmt_u64(deleted)]);
     }
     Ok(table.limit(opts.rows))
@@ -96,4 +96,26 @@ fn build_entity_table(rows: Vec<(String, u64, u64, u64)>, limit: Option<usize>) 
         table.push_row([entity, fmt_u64(added), fmt_u64(deleted), fmt_u64(n_revs)]);
     }
     table.limit(limit)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn abs_churn_keeps_newest_dates_under_row_limit() {
+        let changes = [
+            Change::new("1", "Ada", "2024-01-01", "a.rs", Some(1), Some(0)),
+            Change::new("2", "Ada", "2024-01-02", "a.rs", Some(2), Some(0)),
+            Change::new("3", "Ada", "2024-01-03", "a.rs", Some(3), Some(0)),
+        ];
+        let opts = Options {
+            rows: Some(2),
+            ..Options::default()
+        };
+        let table = abs_churn(&changes, &opts).unwrap_or_default();
+        assert_eq!(table.rows.len(), 2);
+        assert_eq!(table.rows[0][0], "2024-01-03");
+        assert_eq!(table.rows[1][0], "2024-01-02");
+    }
 }

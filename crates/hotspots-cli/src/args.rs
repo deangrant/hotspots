@@ -294,6 +294,18 @@ fn validate(parsed: &Args) -> Result<(), String> {
     if parsed.options.grain == Grain::Function && parsed.options.repo.is_none() {
         return Err(String::from("`--grain function` requires `--repo <path>`"));
     }
+    if !analysis_names().contains(&parsed.options.analysis.as_str()) {
+        return Err(format!(
+            "unknown analysis `{}`; expected one of: {}",
+            parsed.options.analysis,
+            analysis_names().join(", ")
+        ));
+    }
+    if parsed.options.min_coupling > parsed.options.max_coupling {
+        return Err(String::from(
+            "`--min-coupling` must be less than or equal to `--max-coupling`",
+        ));
+    }
     Ok(())
 }
 
@@ -441,6 +453,12 @@ mod tests {
         assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-t", "week"])).is_err());
         assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "--bogus"])).is_err());
         assert!(parse_args(&argv(&["-l"])).is_err());
+    }
+
+    #[test]
+    fn rejects_unknown_analysis_and_coupling_bounds() {
+        assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-a", "nope"])).is_err());
+        assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-i", "80", "-x", "20"])).is_err());
     }
 
     #[test]
