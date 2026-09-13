@@ -67,6 +67,10 @@ fn split_numstat_line(line: &str) -> Result<Option<(u64, u64, String)>> {
     if trimmed.is_empty() {
         return Ok(None);
     }
+    parse_numstat_triple(trimmed)
+}
+
+fn parse_numstat_triple(trimmed: &str) -> Result<Option<(u64, u64, String)>> {
     let (added_raw, deleted_raw, path) = numstat_fields(trimmed)?;
     ensure_not_rename_path(path)?;
     Ok(Some((
@@ -164,11 +168,7 @@ fn push_numstat_change(
     let Some((added, deleted, entity)) = split_numstat_line(line)? else {
         return Ok(());
     };
-    if out.len() >= MAX_CHANGE_ROWS {
-        return Err(Error::msg(format!(
-            "log exceeds {MAX_CHANGE_ROWS} change rows; narrow with --after or --include"
-        )));
-    }
+    ensure_row_capacity(out.len())?;
     out.push(Change::new(
         rev,
         author,
@@ -178,6 +178,19 @@ fn push_numstat_change(
         Some(deleted),
     ));
     Ok(())
+}
+
+fn ensure_row_capacity(len: usize) -> Result<()> {
+    if len >= MAX_CHANGE_ROWS {
+        return Err(row_limit_exceeded());
+    }
+    Ok(())
+}
+
+fn row_limit_exceeded() -> Error {
+    Error::msg(format!(
+        "log exceeds {MAX_CHANGE_ROWS} change rows; narrow with --after or --include"
+    ))
 }
 
 #[cfg(test)]
@@ -224,5 +237,14 @@ mod tests {
         let parsed = GitNumstatParser.parse(&mut Cursor::new(log));
         assert!(parsed.is_ok(), "{:?}", parsed.err());
         assert_eq!(parsed.unwrap_or_default().len(), 1);
+    }
+
+    #[test]
+    fn row_limit_error_mentions_cap() {
+        assert!(ensure_row_capacity(0).is_ok());
+        assert!(ensure_row_capacity(MAX_CHANGE_ROWS).is_err());
+        let err = row_limit_exceeded().to_string();
+        assert!(err.contains(&MAX_CHANGE_ROWS.to_string()));
+        assert!(err.contains("narrow"));
     }
 }

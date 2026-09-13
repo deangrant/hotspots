@@ -23,24 +23,41 @@ pub fn expand_with_diffs(
     let mut out = Vec::new();
     let mut stats = ExpandStats::default();
     for change in changes {
-        if !crate::symbols::is_rust_path(&change.entity) {
-            stats.dropped_non_rust = stats.dropped_non_rust.saturating_add(1);
-            continue;
-        }
-        let key = (change.rev.clone(), change.entity.clone());
-        let diff = diffs.get(&key).ok_or_else(|| {
-            Error::msg(format!(
-                "missing symbol diff for `{}` at `{}`",
-                change.entity, change.rev
-            ))
-        })?;
-        let expanded = expand_file_change(change, diff);
-        if !diff.hunks.is_empty() && expanded.is_empty() {
-            stats.dropped_no_overlap = stats.dropped_no_overlap.saturating_add(1);
-        }
-        out.extend(expanded);
+        expand_one_change(change, diffs, &mut out, &mut stats)?;
     }
     Ok((out, stats))
+}
+
+fn expand_one_change(
+    change: &Change,
+    diffs: &BTreeMap<(String, String), FileDiff>,
+    out: &mut Vec<Change>,
+    stats: &mut ExpandStats,
+) -> Result<()> {
+    if !crate::symbols::is_rust_path(&change.entity) {
+        stats.dropped_non_rust = stats.dropped_non_rust.saturating_add(1);
+        return Ok(());
+    }
+    let diff = require_diff(change, diffs)?;
+    let expanded = expand_file_change(change, diff);
+    if !diff.hunks.is_empty() && expanded.is_empty() {
+        stats.dropped_no_overlap = stats.dropped_no_overlap.saturating_add(1);
+    }
+    out.extend(expanded);
+    Ok(())
+}
+
+fn require_diff<'a>(
+    change: &Change,
+    diffs: &'a BTreeMap<(String, String), FileDiff>,
+) -> Result<&'a FileDiff> {
+    let key = (change.rev.clone(), change.entity.clone());
+    diffs.get(&key).ok_or_else(|| {
+        Error::msg(format!(
+            "missing symbol diff for `{}` at `{}`",
+            change.entity, change.rev
+        ))
+    })
 }
 
 /// Expands one file-level change into zero or more symbol-level changes.
@@ -212,5 +229,25 @@ mod tests {
                 .as_ref()
                 .is_ok_and(|(rows, stats)| { stats.dropped_non_rust == 1 && rows.len() == 1 })
         );
+    }
+
+    #[test]
+    fn missing_diff_errors() {
+        let change = Change::new("1", "Ada", "2024-01-01", "a.rs", Some(1), Some(0));
+        let expanded = expand_with_diffs(&[change], &BTreeMap::new());
+        assert!(expanded.is_err_and(|e| e.to_string().contains("missing symbol diff")));
+    }
+
+    #[test]
+    fn empty_hunks_yield_no_rows() {
+        let change = Change::new("1", "Ada", "2024-01-01", "a.rs", Some(1), Some(0));
+        let diff = FileDiff {
+            rev: String::from("1"),
+            path: String::from("a.rs"),
+            symbols_new: vec![fact("foo", 1, 10)],
+            symbols_old: vec![],
+            hunks: vec![],
+        };
+        assert!(expand_file_change(&change, &diff).is_empty());
     }
 }

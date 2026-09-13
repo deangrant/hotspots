@@ -15,19 +15,32 @@ pub fn parse_hunks(diff_text: &str) -> Vec<Hunk> {
 }
 
 fn parse_hunk_header(line: &str) -> Option<Hunk> {
+    let ranges = hunk_range_text(line)?;
+    hunk_from_ranges(ranges)
+}
+
+fn hunk_range_text(line: &str) -> Option<&str> {
     let rest = line.strip_prefix("@@ ")?;
     let (ranges, _) = rest.split_once(" @@")?;
+    Some(ranges)
+}
+
+fn hunk_from_ranges(ranges: &str) -> Option<Hunk> {
     let mut parts = ranges.split_whitespace();
     let old = parts.next()?;
     let new = parts.next()?;
-    let (old_start, old_count) = parse_range(old.strip_prefix('-')?)?;
-    let (new_start, new_count) = parse_range(new.strip_prefix('+')?)?;
+    let (old_start, old_count) = parse_signed_range(old, '-')?;
+    let (new_start, new_count) = parse_signed_range(new, '+')?;
     Some(Hunk {
         old_start,
         old_count,
         new_start,
         new_count,
     })
+}
+
+fn parse_signed_range(raw: &str, sign: char) -> Option<(u32, u32)> {
+    parse_range(raw.strip_prefix(sign)?)
 }
 
 fn parse_range(raw: &str) -> Option<(u32, u32)> {

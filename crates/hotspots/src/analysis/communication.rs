@@ -1,6 +1,6 @@
 //! Author communication via shared entities.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::analysis::table::Table;
 use crate::analysis::util::{
@@ -11,29 +11,48 @@ use crate::options::Options;
 
 /// Counts how many entities pairs of authors both touched.
 pub fn run(changes: &[Change], opts: &Options) -> Table {
+    let shared = shared_pair_counts(changes, opts);
+    build_communication_table(shared, opts.rows)
+}
+
+fn shared_pair_counts(changes: &[Change], opts: &Options) -> BTreeMap<(String, String), u64> {
     let revs = entity_revisions(changes);
     let authors_by_entity = entity_authors(changes);
-    let mut shared: BTreeMap<(String, String), u64> = BTreeMap::new();
+    let mut shared = BTreeMap::new();
     for (entity, authors) in &authors_by_entity {
         if !meets_min_revs(revs.get(entity).copied().unwrap_or(0), opts) {
             continue;
         }
-        let list: Vec<&String> = authors.iter().collect();
-        for i in 0..list.len() {
-            for j in (i + 1)..list.len() {
-                let pair = ordered_pair(list[i], list[j]);
-                *shared.entry(pair).or_insert(0) += 1;
-            }
+        accumulate_author_pairs(authors, &mut shared);
+    }
+    shared
+}
+
+fn accumulate_author_pairs(
+    authors: &BTreeSet<String>,
+    shared: &mut BTreeMap<(String, String), u64>,
+) {
+    let list: Vec<&String> = authors.iter().collect();
+    for i in 0..list.len() {
+        for j in (i + 1)..list.len() {
+            let pair = ordered_pair(list[i], list[j]);
+            *shared.entry(pair).or_insert(0) += 1;
         }
     }
-    let mut rows: Vec<(String, String, u64)> =
+}
+
+fn build_communication_table(
+    shared: BTreeMap<(String, String), u64>,
+    rows: Option<usize>,
+) -> Table {
+    let mut ranked: Vec<(String, String, u64)> =
         shared.into_iter().map(|((a, b), count)| (a, b, count)).collect();
-    rows.sort_by(|a, b| b.2.cmp(&a.2).then(a.0.cmp(&b.0)).then(a.1.cmp(&b.1)));
+    ranked.sort_by(|a, b| b.2.cmp(&a.2).then(a.0.cmp(&b.0)).then(a.1.cmp(&b.1)));
     let mut table = Table::with_headers(["author", "peer", "shared"]);
-    for (author, peer, count) in rows {
+    for (author, peer, count) in ranked {
         table.push_row([author, peer, fmt_u64(count)]);
     }
-    table.limit(opts.rows)
+    table.limit(rows)
 }
 
 #[cfg(test)]

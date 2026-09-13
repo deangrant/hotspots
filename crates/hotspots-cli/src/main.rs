@@ -174,4 +174,14 @@ mod tests {
         ];
         assert!(run_with_args(&argv).is_err());
     }
+
+    #[test]
+    fn notes_dropped_function_grain_paths() {
+        note_dropped_paths(ExpandStats {
+            dropped_non_rust: 2,
+            dropped_no_overlap: 3,
+        });
+        assert!(function_resolver(Grain::Function).is_some());
+        assert!(function_resolver(Grain::File).is_none());
+    }
 }

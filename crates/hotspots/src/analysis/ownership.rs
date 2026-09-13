@@ -30,25 +30,43 @@ pub fn entity_ownership(changes: &[Change], opts: &Options) -> Result<Table> {
 /// Identifies the main developer by added lines for each entity.
 pub fn main_dev(changes: &[Change], opts: &Options) -> Result<Table> {
     require_churn(changes)?;
+    let rows = main_dev_rows(changes, opts);
+    Ok(build_main_dev_table(rows, opts.rows))
+}
+
+fn main_dev_rows(changes: &[Change], opts: &Options) -> Vec<(String, String, u64, f64)> {
     let revs = entity_revisions(changes);
     let map = collect_churn(changes);
     let mut rows = Vec::new();
     for (entity, authors) in map {
-        if !meets_min_revs(revs.get(&entity).copied().unwrap_or(0), opts) {
-            continue;
-        }
-        let total_added: u64 = authors.values().map(|(a, _)| *a).sum();
-        if let Some((author, added)) = leading_author_by_added(authors) {
-            let ownership = percent(added, total_added);
-            rows.push((entity, author, added, ownership));
+        if let Some(row) = main_dev_row(entity, authors, &revs, opts) {
+            rows.push(row);
         }
     }
     rows.sort_by(|a, b| a.0.cmp(&b.0));
+    rows
+}
+
+fn main_dev_row(
+    entity: String,
+    authors: BTreeMap<String, (u64, u64)>,
+    revs: &BTreeMap<String, u64>,
+    opts: &Options,
+) -> Option<(String, String, u64, f64)> {
+    if !meets_min_revs(revs.get(&entity).copied().unwrap_or(0), opts) {
+        return None;
+    }
+    let total_added: u64 = authors.values().map(|(a, _)| *a).sum();
+    let (author, added) = leading_author_by_added(authors)?;
+    Some((entity, author, added, percent(added, total_added)))
+}
+
+fn build_main_dev_table(rows: Vec<(String, String, u64, f64)>, limit: Option<usize>) -> Table {
     let mut table = Table::with_headers(["entity", "main-dev", "added", "ownership"]);
     for (entity, author, added, ownership) in rows {
         table.push_row([entity, author, fmt_u64(added), fmt_pct(ownership)]);
     }
-    Ok(table.limit(opts.rows))
+    table.limit(limit)
 }
 
 fn collect_churn(changes: &[Change]) -> EntityAuthorChurn {

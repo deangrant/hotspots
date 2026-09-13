@@ -87,4 +87,35 @@ mod tests {
             .is_err()
         );
     }
+
+    struct StubResolver;
+
+    impl SymbolResolver for StubResolver {
+        fn expand(
+            &self,
+            changes: &[Change],
+            _repo: &std::path::Path,
+        ) -> Result<(Vec<Change>, ExpandStats)> {
+            Ok((changes.to_vec(), ExpandStats::default()))
+        }
+    }
+
+    #[test]
+    fn function_grain_calls_resolver() {
+        let changes = vec![Change::new(
+            "1",
+            "Ada",
+            "2024-01-01",
+            "a.rs",
+            Some(1),
+            Some(0),
+        )];
+        let out = apply_grain(
+            changes.clone(),
+            Grain::Function,
+            Some(PathBuf::from(".").as_path()),
+            Some(&StubResolver),
+        );
+        assert!(out.is_ok_and(|(rows, _)| rows == changes));
+    }
 }

@@ -59,14 +59,13 @@ fn write_line<S: AsRef<str>>(out: &mut dyn Write, cells: &[S], widths: &[usize])
 
 fn write_cells<S: AsRef<str>>(out: &mut dyn Write, cells: &[S], widths: &[usize]) -> Result<()> {
     for (col, cell) in cells.iter().enumerate() {
-        write_one_cell(
-            out,
-            cell.as_ref(),
-            widths.get(col).copied().unwrap_or(0),
-            col,
-        )?;
+        write_one_cell(out, cell.as_ref(), cell_width(widths, col), col)?;
     }
     Ok(())
+}
+
+fn cell_width(widths: &[usize], col: usize) -> usize {
+    widths.get(col).copied().unwrap_or(0)
 }
 
 fn write_one_cell(out: &mut dyn Write, value: &str, width: usize, col: usize) -> Result<()> {
@@ -117,5 +116,11 @@ mod tests {
         assert!(lines[1].starts_with("  a.rs"));
         assert!(lines[1].contains("12"));
         assert!(text.contains("2 rows."));
+    }
+
+    #[test]
+    fn cell_width_falls_back_when_missing() {
+        assert_eq!(cell_width(&[3, 4], 0), 3);
+        assert_eq!(cell_width(&[3], 5), 0);
     }
 }

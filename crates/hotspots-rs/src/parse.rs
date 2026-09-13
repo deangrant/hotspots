@@ -21,22 +21,41 @@ pub fn symbols_from_source(path: &str, source: &str) -> hotspots::Result<Vec<Sym
 
 fn collect_items(path: &str, prefix: &str, items: &[Item], facts: &mut Vec<SymbolFact>) {
     for item in items {
-        match item {
-            Item::Fn(func) => {
-                let name = qualify(prefix, &func.sig.ident.to_string());
-                facts.push(fact(path, &name, func.span()));
-            }
-            Item::Impl(imp) => collect_impl(path, prefix, imp, facts),
-            Item::Trait(tr) => collect_trait(path, prefix, tr, facts),
-            Item::Mod(module) => {
-                if let Some((_, items)) = &module.content {
-                    let child = qualify(prefix, &module.ident.to_string());
-                    collect_items(path, &child, items, facts);
-                }
-            }
-            _ => {}
-        }
+        collect_item(path, prefix, item, facts);
     }
+}
+
+fn collect_item(path: &str, prefix: &str, item: &Item, facts: &mut Vec<SymbolFact>) {
+    if let Item::Fn(func) = item {
+        collect_fn(path, prefix, func, facts);
+        return;
+    }
+    if let Item::Impl(imp) = item {
+        collect_impl(path, prefix, imp, facts);
+        return;
+    }
+    collect_container_item(path, prefix, item, facts);
+}
+
+fn collect_container_item(path: &str, prefix: &str, item: &Item, facts: &mut Vec<SymbolFact>) {
+    match item {
+        Item::Trait(tr) => collect_trait(path, prefix, tr, facts),
+        Item::Mod(module) => collect_mod(path, prefix, module, facts),
+        _ => {}
+    }
+}
+
+fn collect_fn(path: &str, prefix: &str, func: &syn::ItemFn, facts: &mut Vec<SymbolFact>) {
+    let name = qualify(prefix, &func.sig.ident.to_string());
+    facts.push(fact(path, &name, func.span()));
+}
+
+fn collect_mod(path: &str, prefix: &str, module: &syn::ItemMod, facts: &mut Vec<SymbolFact>) {
+    let Some((_, items)) = &module.content else {
+        return;
+    };
+    let child = qualify(prefix, &module.ident.to_string());
+    collect_items(path, &child, items, facts);
 }
 
 fn collect_impl(path: &str, prefix: &str, imp: &syn::ItemImpl, facts: &mut Vec<SymbolFact>) {
@@ -184,5 +203,19 @@ impl TraitB for Foo { fn m(&self) {} }
     #[test]
     fn rejects_invalid_rust() {
         assert!(symbols_from_source("a.rs", "fn (").is_err());
+    }
+
+    #[test]
+    fn skips_empty_mod_and_non_path_impl_type() {
+        let src = "\
+mod external;
+impl (u8,) { fn weird(self) {} }
+struct S;
+impl S { const N: u8 = 1; }
+";
+        let facts = symbols_from_source("a.rs", src).unwrap_or_default();
+        // Non-path Self type falls back to bare method name; const items are ignored.
+        assert!(facts.iter().any(|f| f.name == "weird"));
+        assert!(!facts.iter().any(|f| f.name.contains("external")));
     }
 }

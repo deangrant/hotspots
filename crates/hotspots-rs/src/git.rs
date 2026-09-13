@@ -6,7 +6,7 @@
 use std::ffi::OsString;
 use std::io::Read;
 use std::path::Path;
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Child, ChildStderr, ChildStdout, Command, ExitStatus, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -31,41 +31,89 @@ pub struct SystemGit;
 
 impl GitRunner for SystemGit {
     fn run(&self, repo: &Path, args: &[&str]) -> Result<String> {
-        let mut child = Command::new(git_executable())
-            .arg("-C")
-            .arg(repo)
-            .args(args)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| Error::git(format!("failed to run git: {e}")))?;
-        let mut stdout =
-            child.stdout.take().ok_or_else(|| Error::git("git stdout pipe missing"))?;
-        let mut stderr =
-            child.stderr.take().ok_or_else(|| Error::git("git stderr pipe missing"))?;
-        let stdout_handle = thread::spawn(move || {
-            let mut buf = Vec::new();
-            stdout.read_to_end(&mut buf).map(|_| buf)
-        });
-        let stderr_handle = thread::spawn(move || {
-            let mut buf = Vec::new();
-            stderr.read_to_end(&mut buf).map(|_| buf)
-        });
-        let status = wait_with_timeout(&mut child, args)?;
-        let stdout_bytes = stdout_handle
-            .join()
-            .map_err(|_| Error::git("git stdout reader panicked"))?
-            .map_err(|e| Error::git(format!("failed to read git stdout: {e}")))?;
-        let stderr_bytes = stderr_handle
-            .join()
-            .map_err(|_| Error::git("git stderr reader panicked"))?
-            .map_err(|e| Error::git(format!("failed to read git stderr: {e}")))?;
-        if status.success() {
-            return decode_git_bytes(stdout_bytes, "stdout");
-        }
-        let stderr = decode_git_bytes(stderr_bytes, "stderr")?;
-        Err(git_command_failed(args, stderr.trim()))
+        let session = start_git_session(repo, args)?;
+        complete_git_session(session, args)
     }
+}
+
+struct GitSession {
+    child: Child,
+    stdout_handle: thread::JoinHandle<std::io::Result<Vec<u8>>>,
+    stderr_handle: thread::JoinHandle<std::io::Result<Vec<u8>>>,
+}
+
+fn start_git_session(repo: &Path, args: &[&str]) -> Result<GitSession> {
+    let mut child = spawn_git(repo, args)?;
+    let stdout = take_stdout(&mut child)?;
+    let stderr = take_stderr(&mut child)?;
+    Ok(GitSession {
+        child,
+        stdout_handle: spawn_reader(stdout),
+        stderr_handle: spawn_reader(stderr),
+    })
+}
+
+fn complete_git_session(session: GitSession, args: &[&str]) -> Result<String> {
+    let GitSession {
+        mut child,
+        stdout_handle,
+        stderr_handle,
+    } = session;
+    let status = wait_with_timeout(&mut child, args)?;
+    let stdout_bytes = join_reader(stdout_handle, "stdout")?;
+    let stderr_bytes = join_reader(stderr_handle, "stderr")?;
+    finish_git_status(status, args, stdout_bytes, stderr_bytes)
+}
+
+fn spawn_git(repo: &Path, args: &[&str]) -> Result<Child> {
+    Command::new(git_executable())
+        .arg("-C")
+        .arg(repo)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| Error::git(format!("failed to run git: {e}")))
+}
+
+fn take_stdout(child: &mut Child) -> Result<ChildStdout> {
+    child.stdout.take().ok_or_else(|| Error::git("git stdout pipe missing"))
+}
+
+fn take_stderr(child: &mut Child) -> Result<ChildStderr> {
+    child.stderr.take().ok_or_else(|| Error::git("git stderr pipe missing"))
+}
+
+fn spawn_reader(
+    mut pipe: impl Read + Send + 'static,
+) -> thread::JoinHandle<std::io::Result<Vec<u8>>> {
+    thread::spawn(move || {
+        let mut buf = Vec::new();
+        pipe.read_to_end(&mut buf).map(|_| buf)
+    })
+}
+
+fn join_reader(
+    handle: thread::JoinHandle<std::io::Result<Vec<u8>>>,
+    stream: &str,
+) -> Result<Vec<u8>> {
+    handle
+        .join()
+        .map_err(|_| Error::git(format!("git {stream} reader panicked")))?
+        .map_err(|e| Error::git(format!("failed to read git {stream}: {e}")))
+}
+
+fn finish_git_status(
+    status: ExitStatus,
+    args: &[&str],
+    stdout_bytes: Vec<u8>,
+    stderr_bytes: Vec<u8>,
+) -> Result<String> {
+    if status.success() {
+        return decode_git_bytes(stdout_bytes, "stdout");
+    }
+    let stderr = decode_git_bytes(stderr_bytes, "stderr")?;
+    Err(git_command_failed(args, stderr.trim()))
 }
 
 fn git_executable() -> OsString {
@@ -85,26 +133,67 @@ fn git_command_failed(args: &[&str], stderr: &str) -> Error {
     }
 }
 
-fn wait_with_timeout(child: &mut std::process::Child, args: &[&str]) -> Result<ExitStatus> {
+fn wait_with_timeout(child: &mut Child, args: &[&str]) -> Result<ExitStatus> {
+    wait_child(child, args, GIT_TIMEOUT)
+}
+
+fn wait_child(child: &mut Child, args: &[&str], timeout: Duration) -> Result<ExitStatus> {
     let started = Instant::now();
     loop {
-        match child.try_wait() {
-            Ok(Some(status)) => return Ok(status),
-            Ok(None) if started.elapsed() >= GIT_TIMEOUT => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(Error::git(format!(
-                    "git {} timed out after {}s",
-                    args.join(" "),
-                    GIT_TIMEOUT.as_secs()
-                )));
-            }
-            Ok(None) => thread::sleep(Duration::from_millis(50)),
-            Err(e) => {
-                return Err(Error::git(format!("failed to wait for git: {e}")));
-            }
+        let poll = classify_try_wait(child.try_wait(), started.elapsed() >= timeout);
+        if let Some(result) = apply_wait_poll(child, args, timeout, poll) {
+            return result;
         }
     }
+}
+
+enum WaitPoll {
+    Done(ExitStatus),
+    TimedOut,
+    Pending,
+    Failed(String),
+}
+
+fn classify_try_wait(result: std::io::Result<Option<ExitStatus>>, timed_out: bool) -> WaitPoll {
+    match result {
+        Ok(status) => classify_ok_wait(status, timed_out),
+        Err(e) => WaitPoll::Failed(format!("failed to wait for git: {e}")),
+    }
+}
+
+const fn classify_ok_wait(status: Option<ExitStatus>, timed_out: bool) -> WaitPoll {
+    match status {
+        Some(status) => WaitPoll::Done(status),
+        None if timed_out => WaitPoll::TimedOut,
+        None => WaitPoll::Pending,
+    }
+}
+
+fn apply_wait_poll(
+    child: &mut Child,
+    args: &[&str],
+    timeout: Duration,
+    poll: WaitPoll,
+) -> Option<Result<ExitStatus>> {
+    match poll {
+        WaitPoll::Done(status) => Some(Ok(status)),
+        WaitPoll::TimedOut => Some(kill_timed_out(child, args, timeout)),
+        WaitPoll::Pending => {
+            thread::sleep(Duration::from_millis(50));
+            None
+        }
+        WaitPoll::Failed(message) => Some(Err(Error::git(message))),
+    }
+}
+
+fn kill_timed_out(child: &mut Child, args: &[&str], timeout: Duration) -> Result<ExitStatus> {
+    let _ = child.kill();
+    let _ = child.wait();
+    Err(Error::git(format!(
+        "git {} timed out after {}s",
+        args.join(" "),
+        timeout.as_secs()
+    )))
 }
 
 /// Ensures `repo` is a Git work tree.
@@ -201,5 +290,53 @@ mod tests {
     fn decode_rejects_invalid_utf8() {
         assert!(decode_git_bytes(vec![0xff, 0xfe], "stdout").is_err());
         assert!(decode_git_bytes(b"ok".to_vec(), "stdout").is_ok_and(|s| s == "ok"));
+    }
+
+    #[test]
+    fn classify_wait_poll_states() {
+        assert!(matches!(
+            classify_try_wait(Ok(None), false),
+            WaitPoll::Pending
+        ));
+        assert!(matches!(
+            classify_try_wait(Ok(None), true),
+            WaitPoll::TimedOut
+        ));
+        assert!(matches!(
+            classify_try_wait(Err(std::io::Error::other("boom")), false),
+            WaitPoll::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn apply_wait_poll_failed_maps_error() {
+        let spawned = Command::new("true").stdout(Stdio::null()).stderr(Stdio::null()).spawn();
+        assert!(spawned.is_ok(), "spawn true failed");
+        let mut children: Vec<_> = spawned.ok().into_iter().collect();
+        assert_eq!(children.len(), 1);
+        let mut child = children.remove(0);
+        let _ = child.wait();
+        let result = apply_wait_poll(
+            &mut child,
+            &["true"],
+            Duration::from_secs(1),
+            WaitPoll::Failed(String::from("failed to wait for git: boom")),
+        );
+        assert!(result.is_some_and(|r| r.is_err_and(|e| e.to_string().contains("boom"))));
+    }
+
+    #[test]
+    fn wait_child_times_out() {
+        let spawned = Command::new("sleep")
+            .arg("30")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
+        assert!(spawned.is_ok(), "spawn sleep failed");
+        let mut children: Vec<_> = spawned.ok().into_iter().collect();
+        assert_eq!(children.len(), 1);
+        let mut child = children.remove(0);
+        let err = wait_child(&mut child, &["sleep"], Duration::from_millis(50));
+        assert!(err.is_err_and(|e| e.to_string().contains("timed out")));
     }
 }
