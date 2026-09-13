@@ -7,7 +7,9 @@ use hotspots::symbols::{ExpandStats, FileDiff, SymbolResolver, expand_with_diffs
 use hotspots::{Change, Error, Result};
 
 use crate::diff::parse_hunks;
-use crate::git::{GitRunner, SystemGit, ensure_work_tree, show_blob, show_hunks};
+use crate::git::{
+    GitRunner, SystemGit, ensure_work_tree, is_missing_path_error, show_blob, show_hunks,
+};
 use crate::parse::symbols_from_source;
 
 /// Resolves Rust file changes to `path::symbol` entities via git + syn.
@@ -86,7 +88,8 @@ fn load_symbol_sides(
             let symbols_old = load_old_symbols(git, repo, rev, path)?;
             Ok((symbols_new, symbols_old))
         }
-        Err(_) => load_delete_only_symbols(git, repo, rev, path),
+        Err(e) if is_missing_path_error(&e) => load_delete_only_symbols(git, repo, rev, path),
+        Err(e) => Err(Error::msg(format!("cannot load `{path}` at `{rev}`: {e}"))),
     }
 }
 
@@ -224,7 +227,10 @@ mod tests {
             String::from(patch),
         );
         let mut err = HashMap::new();
-        err.insert(String::from("show abc:a.rs"), String::from("missing"));
+        err.insert(
+            String::from("show abc:a.rs"),
+            String::from("fatal: path 'a.rs' does not exist in 'abc'"),
+        );
         let resolver = RustGitSynResolver::with_git(MapGit { ok, err });
         let changes = [Change::new(
             "abc",
@@ -238,5 +244,29 @@ mod tests {
         assert!(expanded.as_ref().is_ok_and(|(rows, _)| {
             rows.iter().any(|c| c.entity == "a.rs::alpha" && c.deleted == Some(1))
         }));
+    }
+
+    #[test]
+    fn rejects_non_missing_new_side_show_error() {
+        let old_src = "fn alpha() {}\n";
+        let mut ok = HashMap::new();
+        ok.insert(
+            String::from("rev-parse --is-inside-work-tree"),
+            String::from("true\n"),
+        );
+        ok.insert(String::from("show abc^:a.rs"), String::from(old_src));
+        let mut err = HashMap::new();
+        err.insert(String::from("show abc:a.rs"), String::from("bad object"));
+        let resolver = RustGitSynResolver::with_git(MapGit { ok, err });
+        let changes = [Change::new(
+            "abc",
+            "Ada",
+            "2024-01-01",
+            "a.rs",
+            Some(0),
+            Some(1),
+        )];
+        let expanded = resolver.expand(&changes, Path::new("/repo"));
+        assert!(expanded.is_err());
     }
 }

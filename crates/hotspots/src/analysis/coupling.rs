@@ -3,19 +3,21 @@
 use std::collections::BTreeMap;
 
 use crate::analysis::table::Table;
-use crate::analysis::util::{entity_revisions, fmt_u64, meets_min_revs, ordered_pair};
+use crate::analysis::util::{fmt_u64, meets_min_revs, ordered_pair};
 use crate::index::ChangesetIndex;
 use crate::model::Change;
 use crate::options::Options;
 
 type CouplingRow = (String, String, u64, u64);
 
-/// Ranks entity pairs by shared-commit coupling degree.
+/// Ranks entity pairs by shared-changeset coupling degree.
 ///
-/// Degree is `100 * shared_revs / max(revs_a, revs_b)`.
+/// Degree is `100 * shared_changesets / max(revs_a, revs_b)`, where revision
+/// counts use the same logical changesets as the shared numerator (commits, or
+/// day-merged author/date buckets when `--temporal-period day` is set).
 pub fn run(changes: &[Change], opts: &Options) -> Table {
     let index = ChangesetIndex::build(changes, opts.temporal_period);
-    let revs = entity_revisions(changes);
+    let revs = index.entity_revisions();
     let shared = pair_shared_counts(&index, opts.max_changeset_size);
     let mut rows = collect_rows(shared, &revs, opts);
     rows.sort_by(|a, b| b.2.cmp(&a.2).then(b.3.cmp(&a.3)).then(a.0.cmp(&b.0)));
@@ -181,5 +183,31 @@ mod tests {
         o.min_shared_revs = 1;
         let table = run(&changes, &o);
         assert!(table.rows.iter().all(|row| row[0] != "lonely.rs" && row[1] != "lonely.rs"));
+    }
+
+    fn same_day_pair_changes() -> Vec<Change> {
+        vec![
+            Change::new("1", "Ada", "2024-01-01", "a.rs", None, None),
+            Change::new("1", "Ada", "2024-01-01", "b.rs", None, None),
+            Change::new("2", "Ada", "2024-01-01", "a.rs", None, None),
+            Change::new("2", "Ada", "2024-01-01", "b.rs", None, None),
+        ]
+    }
+
+    #[test]
+    fn day_period_degree_uses_logical_revisions() {
+        let mut o = opts();
+        o.temporal_period = crate::options::TemporalPeriod::Day;
+        let table = run(&same_day_pair_changes(), &o);
+        assert_eq!(table.rows.len(), 1);
+        assert_eq!(table.rows[0][2], "100");
+    }
+
+    #[test]
+    fn day_period_min_revs_uses_logical_revisions() {
+        let mut o = opts();
+        o.temporal_period = crate::options::TemporalPeriod::Day;
+        o.min_revs = 2;
+        assert!(run(&same_day_pair_changes(), &o).rows.is_empty());
     }
 }

@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::analysis::table::Table;
-use crate::analysis::util::{count_as_u64, entity_revisions, fmt_u64, meets_min_revs};
+use crate::analysis::util::{count_as_u64, fmt_u64, meets_min_revs};
 use crate::index::{Changeset, ChangesetIndex};
 use crate::model::Change;
 use crate::options::Options;
@@ -11,7 +11,7 @@ use crate::options::Options;
 /// Sums `(changeset_size - 1)` across changesets containing each entity.
 pub fn run(changes: &[Change], opts: &Options) -> Table {
     let index = ChangesetIndex::build(changes, opts.temporal_period);
-    let revs = entity_revisions(changes);
+    let revs = index.entity_revisions();
     let scores = accumulate_scores(&index, opts.max_changeset_size);
     let mut rows = filter_scores(scores, &revs, opts);
     rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
@@ -102,5 +102,26 @@ mod tests {
         assert!(scores.is_empty());
         add_changeset_score(&mut scores, &big, 30);
         assert_eq!(scores.get("a.rs"), Some(&1));
+    }
+
+    fn same_day_pair_changes() -> Vec<Change> {
+        vec![
+            Change::new("1", "Ada", "2024-01-01", "a.rs", None, None),
+            Change::new("1", "Ada", "2024-01-01", "b.rs", None, None),
+            Change::new("2", "Ada", "2024-01-01", "a.rs", None, None),
+            Change::new("2", "Ada", "2024-01-01", "b.rs", None, None),
+        ]
+    }
+
+    #[test]
+    fn day_period_min_revs_uses_logical_revisions() {
+        let mut opts = Options {
+            min_revs: 2,
+            ..Options::default()
+        };
+        opts.temporal_period = crate::options::TemporalPeriod::Day;
+        assert!(run(&same_day_pair_changes(), &opts).rows.is_empty());
+        opts.min_revs = 1;
+        assert!(!run(&same_day_pair_changes(), &opts).rows.is_empty());
     }
 }

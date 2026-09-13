@@ -48,6 +48,18 @@ impl ChangesetIndex {
     pub fn changesets(&self) -> Vec<&Changeset> {
         self.by_rev.values().collect()
     }
+
+    /// Counts distinct logical changesets containing each entity.
+    #[must_use]
+    pub fn entity_revisions(&self) -> BTreeMap<String, u64> {
+        let mut map: BTreeMap<String, u64> = BTreeMap::new();
+        for changeset in self.by_rev.values() {
+            for entity in &changeset.entities {
+                *map.entry(entity.clone()).or_insert(0) += 1;
+            }
+        }
+        map
+    }
 }
 
 fn logical_rev(change: &Change, period: TemporalPeriod) -> String {
@@ -84,5 +96,20 @@ mod tests {
         let index = ChangesetIndex::build(&changes, TemporalPeriod::None);
         assert_eq!(index.by_rev.len(), 2);
         assert_eq!(index.changesets().len(), 2);
+    }
+
+    #[test]
+    fn entity_revisions_match_logical_period() {
+        let changes = vec![
+            Change::new("a", "Ada", "2024-01-01", "x.rs", None, None),
+            Change::new("b", "Ada", "2024-01-01", "x.rs", None, None),
+            Change::new("b", "Ada", "2024-01-01", "y.rs", None, None),
+        ];
+        let day = ChangesetIndex::build(&changes, TemporalPeriod::Day);
+        assert_eq!(day.entity_revisions().get("x.rs").copied(), Some(1));
+        assert_eq!(day.entity_revisions().get("y.rs").copied(), Some(1));
+        let none = ChangesetIndex::build(&changes, TemporalPeriod::None);
+        assert_eq!(none.entity_revisions().get("x.rs").copied(), Some(2));
+        assert_eq!(none.entity_revisions().get("y.rs").copied(), Some(1));
     }
 }

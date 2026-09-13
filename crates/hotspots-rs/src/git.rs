@@ -65,6 +65,12 @@ pub fn show_blob(git: &dyn GitRunner, repo: &Path, rev: &str, path: &str) -> Res
     git.run(repo, &["show", &spec])
 }
 
+/// Returns whether `err` looks like Git's missing-path message for `show REV:PATH`.
+#[must_use]
+pub fn is_missing_path_error(err: &Error) -> bool {
+    err.to_string().to_ascii_lowercase().contains("does not exist")
+}
+
 /// Loads a zero-context patch for `path` at `rev` against its first parent.
 ///
 /// # Errors
