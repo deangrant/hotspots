@@ -1,21 +1,22 @@
 # hotspots
 
 Command-line tool that mines **exported Git history logs** and prints
-**JSON** maintenance metrics: churn, ownership, age, coupling, communication,
-and related code-health signals.
+**JSON** maintenance metrics. By default it ranks files by a composite
+**risk** score (0–100 within the current log) from revisions, churn, SOC, and
+ownership fragmentation.
 
-Metrics are **indicators**, not blame. High coupling can be intentional; treat
-results as prompts for investigation.
+Metrics are **indicators**, not blame or defect probability. High scores mean
+“investigate,” not “this will fail.”
 
 ## Build and run
 
 ```bash
 cargo build -p hotspots-cli --release
-cargo run -p hotspots-cli -- -l logfile.log -c git2 -a summary
+cargo run -p hotspots-cli -- -l logfile.log -c git2 -n 1
 ```
 
-The binary name is `hotspots`. Analysis results are written to stdout as a JSON
-array of objects.
+Omitting `-a` runs the default **risk** analysis. Results are a JSON array of
+objects on stdout.
 
 ## Generate a Git log
 
@@ -39,6 +40,9 @@ Prefer `--no-renames` so paths stay comparable across commits. Limit history wit
 ## Examples
 
 ```bash
+# Default: relative risk ranking (0–100 within this log)
+cargo run -p hotspots-cli -- -l logfile.log -c git2 -n 1 -r 20
+
 # Authors per entity
 cargo run -p hotspots-cli -- -l logfile.log -c git2 -a authors -n 5
 

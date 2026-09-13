@@ -10,6 +10,7 @@ mod hotspots;
 mod identity;
 mod ownership;
 mod revisions;
+mod risk;
 mod soc;
 mod summary;
 mod table;
@@ -30,6 +31,7 @@ const INFALLIBLE: &[(&str, InfallibleAnalysis)] = &[
     ("authors", authors::run),
     ("revisions", revisions::run),
     ("hotspots", hotspots::run),
+    ("risk", risk::run),
     ("coupling", coupling::run),
     ("soc", soc::run),
     ("entity-effort", effort::entity_effort),
@@ -86,6 +88,7 @@ pub const fn analysis_names() -> &'static [&'static str] {
         "main-dev",
         "main-dev-by-revs",
         "revisions",
+        "risk",
         "soc",
         "summary",
     ]

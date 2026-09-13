@@ -26,6 +26,12 @@ fn accumulate_scores(index: &ChangesetIndex, max_changeset_size: usize) -> BTree
     scores
 }
 
+/// SOC scores for every entity that appears in eligible changesets.
+pub fn scores_by_entity(changes: &[Change], opts: &Options) -> BTreeMap<String, u64> {
+    let index = ChangesetIndex::build(changes, opts.temporal_period);
+    accumulate_scores(&index, opts.max_changeset_size)
+}
+
 fn add_changeset_score(
     scores: &mut BTreeMap<String, u64>,
     changeset: &Changeset,

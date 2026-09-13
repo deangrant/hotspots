@@ -36,3 +36,8 @@ fn entity_churn_totals(changes: &[Change]) -> BTreeMap<String, u64> {
     }
     map
 }
+
+/// Total added+deleted lines per entity (missing numstat counts as zero).
+pub fn churn_totals(changes: &[Change]) -> BTreeMap<String, u64> {
+    entity_churn_totals(changes)
+}

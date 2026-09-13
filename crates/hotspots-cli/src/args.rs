@@ -277,7 +277,7 @@ Usage:
 Options:
   -l, --log PATH                 VCS log file (required)
   -c, --vcs git|git2             Log format (required)
-  -a, --analysis NAME            Analysis to run (default: authors)
+  -a, --analysis NAME            Analysis to run (default: risk)
   -r, --rows N                   Max output rows
   -n, --min-revs N               Min revisions per entity (default: 5)
   -m, --min-shared-revs N        Min shared revisions for coupling (default: 5)
@@ -373,6 +373,13 @@ mod tests {
                 && p.options.include == vec![String::from("src")]
                 && p.options.group_file.as_deref() == Some("groups.txt")
         }));
+    }
+
+    #[test]
+    fn defaults_analysis_to_risk() {
+        let parsed = parse_args(&argv(&["-l", "log.txt", "-c", "git2"]));
+        assert!(parsed.as_ref().is_ok_and(|p| p.options.analysis == "risk"));
+        assert_eq!(Options::default().analysis, "risk");
     }
 
     #[test]

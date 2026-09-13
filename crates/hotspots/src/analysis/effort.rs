@@ -110,6 +110,17 @@ fn fragmentation_score(authors: &BTreeMap<String, BTreeSet<String>>, total: u64)
     1.0 - sum_sq
 }
 
+/// Fragmentation score per entity (unfiltered).
+pub fn fragmentation_by_entity(changes: &[Change]) -> BTreeMap<String, f64> {
+    let map = collect_revs(changes);
+    map.into_iter()
+        .map(|(entity, authors)| {
+            let total = total_revs(&authors);
+            (entity, fragmentation_score(&authors, total))
+        })
+        .collect()
+}
+
 fn leading_author_by_revs(authors: BTreeMap<String, BTreeSet<String>>) -> Option<(String, u64)> {
     authors
         .into_iter()

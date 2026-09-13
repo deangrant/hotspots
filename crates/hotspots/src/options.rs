@@ -41,7 +41,7 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
-            analysis: String::from("authors"),
+            analysis: String::from("risk"),
             rows: None,
             min_revs: 5,
             min_shared_revs: 5,
