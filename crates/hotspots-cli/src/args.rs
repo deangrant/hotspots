@@ -61,140 +61,252 @@ fn parse_required_args(argv: &[String]) -> Result<Args, String> {
     Ok(parsed)
 }
 
+#[derive(Clone, Copy)]
+#[repr(usize)]
+enum Flag {
+    Log = 0,
+    Vcs = 1,
+    Analysis = 2,
+    Rows = 3,
+    MinRevs = 4,
+    MinSharedRevs = 5,
+    MinCoupling = 6,
+    MaxCoupling = 7,
+    MaxChangesetSize = 8,
+    AgeTimeNow = 9,
+    TemporalPeriod = 10,
+    Group = 11,
+    Exclude = 12,
+    Include = 13,
+    Format = 14,
+    Grain = 15,
+    Repo = 16,
+}
+
+const FLAG_NAMES: &[(&[&str], Flag)] = &[
+    (&["-l", "--log"], Flag::Log),
+    (&["-c", "--vcs"], Flag::Vcs),
+    (&["-a", "--analysis"], Flag::Analysis),
+    (&["-r", "--rows"], Flag::Rows),
+    (&["-n", "--min-revs"], Flag::MinRevs),
+    (&["-m", "--min-shared-revs"], Flag::MinSharedRevs),
+    (&["-i", "--min-coupling"], Flag::MinCoupling),
+    (&["-x", "--max-coupling"], Flag::MaxCoupling),
+    (&["-s", "--max-changeset-size"], Flag::MaxChangesetSize),
+    (&["-d", "--age-time-now"], Flag::AgeTimeNow),
+    (&["-t", "--temporal-period"], Flag::TemporalPeriod),
+    (&["-g", "--group"], Flag::Group),
+    (&["--exclude"], Flag::Exclude),
+    (&["--include"], Flag::Include),
+    (&["--format"], Flag::Format),
+    (&["--grain"], Flag::Grain),
+    (&["--repo"], Flag::Repo),
+];
+
 fn parse_flag(
     flag: &str,
     argv: &[String],
     index: usize,
     parsed: &mut Args,
 ) -> Result<usize, String> {
-    if let Some(next) = try_string_flag(flag, argv, index, parsed)? {
-        return Ok(next);
-    }
-    if let Some(next) = try_int_flag(flag, argv, index, parsed)? {
-        return Ok(next);
-    }
-    if let Some(next) = try_optional_flag(flag, argv, index, parsed)? {
-        return Ok(next);
-    }
-    if let Some(next) = try_push_flag(flag, argv, index, parsed)? {
-        return Ok(next);
-    }
-    if let Some(next) = try_specialty_flag(flag, argv, index, parsed)? {
-        return Ok(next);
-    }
-    Err(format!("unknown argument `{flag}`"))
-}
-
-fn try_string_flag(
-    flag: &str,
-    argv: &[String],
-    index: usize,
-    parsed: &mut Args,
-) -> Result<Option<usize>, String> {
-    let target = match flag {
-        "-l" | "--log" => &mut parsed.log,
-        "-c" | "--vcs" => &mut parsed.vcs,
-        "-a" | "--analysis" => &mut parsed.options.analysis,
-        _ => return Ok(None),
+    let Some(kind) = lookup_flag(flag) else {
+        return Err(format!("unknown argument `{flag}`"));
     };
-    Ok(Some(assign_string(argv, index, flag, target)?))
+    apply_flag(kind, argv, index, flag, parsed)
 }
 
-fn try_int_flag(
-    flag: &str,
+fn lookup_flag(flag: &str) -> Option<Flag> {
+    FLAG_NAMES
+        .iter()
+        .find(|(names, _)| names.contains(&flag))
+        .map(|(_, kind)| *kind)
+}
+
+fn apply_flag(
+    kind: Flag,
     argv: &[String],
     index: usize,
+    flag: &str,
     parsed: &mut Args,
-) -> Result<Option<usize>, String> {
-    match flag {
-        "-n" | "--min-revs" => Ok(Some(assign_int(
-            argv,
-            index,
-            flag,
-            &mut parsed.options.min_revs,
-        )?)),
-        "-m" | "--min-shared-revs" => Ok(Some(assign_int(
-            argv,
-            index,
-            flag,
-            &mut parsed.options.min_shared_revs,
-        )?)),
-        "-i" | "--min-coupling" => Ok(Some(assign_int(
-            argv,
-            index,
-            flag,
-            &mut parsed.options.min_coupling,
-        )?)),
-        "-x" | "--max-coupling" => Ok(Some(assign_int(
-            argv,
-            index,
-            flag,
-            &mut parsed.options.max_coupling,
-        )?)),
-        "-s" | "--max-changeset-size" => Ok(Some(assign_int(
-            argv,
-            index,
-            flag,
-            &mut parsed.options.max_changeset_size,
-        )?)),
-        _ => Ok(None),
+) -> Result<usize, String> {
+    match (kind as usize) / 6 {
+        0 => apply_low(kind, argv, index, flag, parsed),
+        1 => apply_mid(kind, argv, index, flag, parsed),
+        _ => apply_high(kind, argv, index, flag, parsed),
     }
 }
 
-fn try_optional_flag(
-    flag: &str,
+fn apply_low(
+    kind: Flag,
     argv: &[String],
     index: usize,
-    parsed: &mut Args,
-) -> Result<Option<usize>, String> {
-    let target = match flag {
-        "-d" | "--age-time-now" => &mut parsed.options.age_time_now,
-        "-g" | "--group" => &mut parsed.options.group_file,
-        "--repo" => &mut parsed.options.repo,
-        _ => return Ok(None),
-    };
-    Ok(Some(assign_optional(argv, index, flag, target)?))
-}
-
-fn try_push_flag(
     flag: &str,
-    argv: &[String],
-    index: usize,
     parsed: &mut Args,
-) -> Result<Option<usize>, String> {
-    let target = match flag {
-        "--exclude" => &mut parsed.options.exclude,
-        "--include" => &mut parsed.options.include,
-        _ => return Ok(None),
-    };
-    Ok(Some(push_string(argv, index, flag, target)?))
-}
-
-fn try_specialty_flag(
-    flag: &str,
-    argv: &[String],
-    index: usize,
-    parsed: &mut Args,
-) -> Result<Option<usize>, String> {
-    match flag {
-        "-r" | "--rows" => {
-            parsed.options.rows = Some(parse_int(require_value(argv, index, flag)?, flag)?);
-            Ok(Some(index + 2))
-        }
-        "-t" | "--temporal-period" => {
-            parsed.options.temporal_period = parse_temporal(require_value(argv, index, flag)?)?;
-            Ok(Some(index + 2))
-        }
-        "--format" => {
-            parsed.format = OutputFormat::parse(require_value(argv, index, flag)?)?;
-            Ok(Some(index + 2))
-        }
-        "--grain" => {
-            parsed.options.grain = Grain::parse(require_value(argv, index, flag)?)?;
-            Ok(Some(index + 2))
-        }
-        _ => Ok(None),
+) -> Result<usize, String> {
+    if (kind as usize) < 3 {
+        apply_slot_0_2(kind, argv, index, flag, parsed)
+    } else {
+        apply_slot_3_5(kind, argv, index, flag, parsed)
     }
+}
+
+fn apply_mid(
+    kind: Flag,
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    if (kind as usize) >= 9 {
+        return apply_slot_9_11(kind, argv, index, flag, parsed);
+    }
+    apply_slot_6_8(kind, argv, index, flag, parsed)
+}
+
+fn apply_high(
+    kind: Flag,
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    let use_top = (kind as usize) >= 15;
+    if use_top {
+        apply_slot_15_17(kind, argv, index, flag, parsed)
+    } else {
+        apply_slot_12_14(kind, argv, index, flag, parsed)
+    }
+}
+
+fn apply_slot_0_2(
+    kind: Flag,
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    match kind {
+        Flag::Log => assign_string(argv, index, flag, &mut parsed.log),
+        Flag::Vcs => assign_string(argv, index, flag, &mut parsed.vcs),
+        Flag::Analysis => assign_string(argv, index, flag, &mut parsed.options.analysis),
+        _ => Err(format!("unhandled argument `{flag}`")),
+    }
+}
+
+fn apply_slot_3_5(
+    kind: Flag,
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    match kind {
+        Flag::Rows => apply_rows(argv, index, flag, parsed),
+        Flag::MinRevs => assign_int(argv, index, flag, &mut parsed.options.min_revs),
+        Flag::MinSharedRevs => assign_int(argv, index, flag, &mut parsed.options.min_shared_revs),
+        _ => Err(format!("unhandled argument `{flag}`")),
+    }
+}
+
+fn apply_rows(
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    parsed.options.rows = Some(parse_int(require_value(argv, index, flag)?, flag)?);
+    Ok(index + 2)
+}
+
+fn apply_slot_6_8(
+    kind: Flag,
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    match kind {
+        Flag::MinCoupling => assign_int(argv, index, flag, &mut parsed.options.min_coupling),
+        Flag::MaxCoupling => assign_int(argv, index, flag, &mut parsed.options.max_coupling),
+        Flag::MaxChangesetSize => {
+            assign_int(argv, index, flag, &mut parsed.options.max_changeset_size)
+        }
+        _ => Err(format!("unhandled argument `{flag}`")),
+    }
+}
+
+fn apply_slot_9_11(
+    kind: Flag,
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    match kind {
+        Flag::AgeTimeNow => assign_optional(argv, index, flag, &mut parsed.options.age_time_now),
+        Flag::TemporalPeriod => apply_temporal(argv, index, flag, parsed),
+        Flag::Group => assign_optional(argv, index, flag, &mut parsed.options.group_file),
+        _ => Err(format!("unhandled argument `{flag}`")),
+    }
+}
+
+fn apply_temporal(
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    parsed.options.temporal_period = parse_temporal(require_value(argv, index, flag)?)?;
+    Ok(index + 2)
+}
+
+fn apply_slot_12_14(
+    kind: Flag,
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    match kind {
+        Flag::Exclude => push_string(argv, index, flag, &mut parsed.options.exclude),
+        Flag::Include => push_string(argv, index, flag, &mut parsed.options.include),
+        Flag::Format => apply_format(argv, index, flag, parsed),
+        _ => Err(format!("unhandled argument `{flag}`")),
+    }
+}
+
+fn apply_format(
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    parsed.format = OutputFormat::parse(require_value(argv, index, flag)?)?;
+    Ok(index + 2)
+}
+
+fn apply_slot_15_17(
+    kind: Flag,
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    match kind {
+        Flag::Grain => apply_grain(argv, index, flag, parsed),
+        Flag::Repo => assign_optional(argv, index, flag, &mut parsed.options.repo),
+        _ => Err(format!("unhandled argument `{flag}`")),
+    }
+}
+
+fn apply_grain(
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    parsed.options.grain = Grain::parse(require_value(argv, index, flag)?)?;
+    Ok(index + 2)
 }
 
 fn assign_string(
@@ -421,6 +533,26 @@ mod tests {
         assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-t", "week"])).is_err());
         assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "--bogus"])).is_err());
         assert!(parse_args(&argv(&["-l"])).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_optional_integers() {
+        assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-m", "nope"])).is_err());
+        assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-i", "nope"])).is_err());
+        assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-x", "nope"])).is_err());
+        assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-s", "nope"])).is_err());
+    }
+
+    #[test]
+    fn slot_helpers_reject_mismatched_kinds() {
+        let mut parsed = help_args();
+        let argv = argv(&["hotspots"]);
+        assert!(apply_slot_0_2(Flag::Rows, &argv, 0, "-r", &mut parsed).is_err());
+        assert!(apply_slot_3_5(Flag::Log, &argv, 0, "-l", &mut parsed).is_err());
+        assert!(apply_slot_6_8(Flag::Group, &argv, 0, "-g", &mut parsed).is_err());
+        assert!(apply_slot_9_11(Flag::Exclude, &argv, 0, "--exclude", &mut parsed).is_err());
+        assert!(apply_slot_12_14(Flag::Repo, &argv, 0, "--repo", &mut parsed).is_err());
+        assert!(apply_slot_15_17(Flag::Log, &argv, 0, "-l", &mut parsed).is_err());
     }
 
     #[test]

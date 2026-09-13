@@ -91,9 +91,17 @@ fn append_escaped(out: &mut String, ch: char) {
 }
 
 const fn simple_escape(ch: char) -> Option<&'static str> {
+    if ch == '"' {
+        return Some("\\\"");
+    }
+    if ch == '\\' {
+        return Some("\\\\");
+    }
+    simple_escape_control(ch)
+}
+
+const fn simple_escape_control(ch: char) -> Option<&'static str> {
     match ch {
-        '"' => Some("\\\""),
-        '\\' => Some("\\\\"),
         '\n' => Some("\\n"),
         '\r' => Some("\\r"),
         '\t' => Some("\\t"),
@@ -133,12 +141,13 @@ mod tests {
     #[test]
     fn escapes_backslash_tab_cr_and_control() {
         let mut table = Table::with_headers(["h"]);
-        table.push_row(["\\\t\r\u{0001}"]);
+        table.push_row(["\\\t\n\r\u{0001}"]);
         let mut buf = Vec::new();
         assert!(write_json(&mut buf, &table).is_ok());
         let text = String::from_utf8(buf).unwrap_or_default();
         assert!(text.contains("\\\\"));
         assert!(text.contains("\\t"));
+        assert!(text.contains("\\n"));
         assert!(text.contains("\\r"));
         assert!(text.contains("\\u0001"));
     }
