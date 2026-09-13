@@ -1,0 +1,21 @@
+[package]
+name = "hotspots-cli"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Command-line front end for Git history maintenance metrics."
+readme = "../../README.md"
+repository = "https://github.com/deangrant/hotspots"
+keywords = ["git", "metrics", "cli", "hotspots"]
+categories = ["command-line-utilities", "development-tools"]
+
+[[bin]]
+name = "hotspots"
+path = "src/main.rs"
+doc = false
+
+[dependencies]
+hotspots = { path = "../hotspots", version = "0.1.0" }
+
+[lints]
+workspace = true

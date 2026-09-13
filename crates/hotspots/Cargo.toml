@@ -1,0 +1,15 @@
+[package]
+name = "hotspots"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+description = "Parse Git history logs and compute maintenance metrics."
+readme = "../../README.md"
+repository = "https://github.com/deangrant/hotspots"
+keywords = ["git", "metrics", "code-analysis", "hotspots"]
+categories = ["development-tools", "command-line-utilities"]
+
+[dependencies]
+
+[lints]
+workspace = true
