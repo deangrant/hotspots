@@ -56,6 +56,9 @@ fn is_planned_vcs(vcs: &str) -> bool {
     ["svn", "hg", "p4", "tfs"].contains(&vcs)
 }
 
+/// Maximum change rows retained from a single log parse.
+pub const MAX_CHANGE_ROWS: usize = 1_000_000;
+
 /// Parses a numstat added or deleted field.
 ///
 /// A dash (`-`) means a binary file and becomes zero.
@@ -74,11 +77,21 @@ fn split_numstat_line(line: &str) -> Result<Option<(u64, u64, String)>> {
         return Ok(None);
     }
     let (added_raw, deleted_raw, path) = numstat_fields(trimmed)?;
+    ensure_not_rename_path(path)?;
     Ok(Some((
         parse_numstat_count(added_raw)?,
         parse_numstat_count(deleted_raw)?,
         path.to_owned(),
     )))
+}
+
+fn ensure_not_rename_path(path: &str) -> Result<()> {
+    if path.contains(" => ") {
+        return Err(Error::msg(format!(
+            "rename/copy numstat path is unsupported (use --no-renames): {path}"
+        )));
+    }
+    Ok(())
 }
 
 fn numstat_fields(line: &str) -> Result<(&str, &str, &str)> {
@@ -160,6 +173,11 @@ fn push_numstat_change(
     let Some((added, deleted, entity)) = split_numstat_line(line)? else {
         return Ok(());
     };
+    if out.len() >= MAX_CHANGE_ROWS {
+        return Err(Error::msg(format!(
+            "log exceeds {MAX_CHANGE_ROWS} change rows; narrow with --after or --include"
+        )));
+    }
     out.push(Change::new(
         rev,
         author,
@@ -200,6 +218,7 @@ mod tests {
         assert!(split_numstat_line("").unwrap_or(Some((0, 0, String::new()))).is_none());
         assert!(split_numstat_line("1\t2\tpath.rs").is_ok());
         assert!(split_numstat_line("1\t2").is_err());
+        assert!(split_numstat_line("1\t2\told.rs => new.rs").is_err());
     }
 
     #[test]

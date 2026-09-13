@@ -1,6 +1,8 @@
 //! Command-line argument parsing for the hotspots binary.
 
-use hotspots::{Grain, Options, OutputFormat, TemporalPeriod, analysis_names};
+use hotspots::{
+    Grain, MAX_CHANGESET_SIZE_LIMIT, Options, OutputFormat, TemporalPeriod, analysis_names,
+};
 
 /// Parsed CLI invocation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -306,6 +308,11 @@ fn validate(parsed: &Args) -> Result<(), String> {
             "`--min-coupling` must be less than or equal to `--max-coupling`",
         ));
     }
+    if parsed.options.max_changeset_size > MAX_CHANGESET_SIZE_LIMIT {
+        return Err(format!(
+            "`--max-changeset-size` must be at most {MAX_CHANGESET_SIZE_LIMIT}"
+        ));
+    }
     Ok(())
 }
 
@@ -329,7 +336,7 @@ Options:
   -m, --min-shared-revs N        Min shared revisions for coupling (default: 5)
   -i, --min-coupling N           Min coupling degree percent (default: 30)
   -x, --max-coupling N           Max coupling degree percent (default: 100)
-  -s, --max-changeset-size N     Max changeset size for coupling (default: 30)
+  -s, --max-changeset-size N     Max changeset size for coupling (default: 30, max: 200)
   -d, --age-time-now YYYY-MM-DD  Reference date for age analysis
   -t, --temporal-period day      Merge same-day commits per author
   -g, --group FILE               Layer map (`prefix => layer` lines)
@@ -459,6 +466,7 @@ mod tests {
     fn rejects_unknown_analysis_and_coupling_bounds() {
         assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-a", "nope"])).is_err());
         assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-i", "80", "-x", "20"])).is_err());
+        assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-s", "201"])).is_err());
     }
 
     #[test]

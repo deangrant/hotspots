@@ -28,7 +28,7 @@ fn parse_git2_fields(rest: &str, line: &str) -> Result<Option<(String, String, S
     let rev = require_part(parts.next(), "rev")?;
     let date = require_part(parts.next(), "date")?;
     let author = require_part(parts.next(), "author")?;
-    ensure_git2_fields(rev, date, line)?;
+    ensure_git2_fields(rev, date, author, line)?;
     Ok(Some((rev.to_owned(), author.to_owned(), date.to_owned())))
 }
 
@@ -36,10 +36,15 @@ fn require_part<'a>(part: Option<&'a str>, label: &str) -> Result<&'a str> {
     part.ok_or_else(|| Error::msg(format!("git2 header missing {label}")))
 }
 
-fn ensure_git2_fields(rev: &str, date: &str, line: &str) -> Result<()> {
-    if rev.is_empty() || date.is_empty() {
+fn ensure_git2_fields(rev: &str, date: &str, author: &str, line: &str) -> Result<()> {
+    if rev.is_empty() || date.is_empty() || author.is_empty() {
         return Err(Error::msg(format!("malformed git2 header: {line}")));
     }
+    crate::date::parse_date(date).map_err(|_| {
+        Error::msg(format!(
+            "malformed git2 header date (expected YYYY-MM-DD): {line}"
+        ))
+    })?;
     Ok(())
 }
 
@@ -71,5 +76,15 @@ mod tests {
         assert!(GitNumstatParser.parse(&mut Cursor::new("--onlyrev")).is_err());
         assert!(GitNumstatParser.parse(&mut Cursor::new("--rev----author")).is_err());
         assert!(GitNumstatParser.parse(&mut Cursor::new("----2024-01-01--Ada")).is_err());
+        assert!(
+            GitNumstatParser
+                .parse(&mut Cursor::new("--abc--2024-01-01--\n1\t0\ta.rs\n"))
+                .is_err()
+        );
+        assert!(
+            GitNumstatParser
+                .parse(&mut Cursor::new("--abc--not-a-date--Ada\n1\t0\ta.rs\n"))
+                .is_err()
+        );
     }
 }

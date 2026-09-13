@@ -1,9 +1,15 @@
 //! Git command helpers.
 
+use std::io::Read;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, ExitStatus, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use hotspots::{Error, Result};
+
+/// Maximum wall time allowed for a single `git` invocation.
+const GIT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Runs git commands in a repository.
 pub trait GitRunner {
@@ -21,21 +27,66 @@ pub struct SystemGit;
 
 impl GitRunner for SystemGit {
     fn run(&self, repo: &Path, args: &[&str]) -> Result<String> {
-        let output = Command::new("git")
+        let mut child = Command::new("git")
             .arg("-C")
             .arg(repo)
             .args(args)
-            .output()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
             .map_err(|e| Error::msg(format!("failed to run git: {e}")))?;
-        if output.status.success() {
-            return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
+        let mut stdout =
+            child.stdout.take().ok_or_else(|| Error::msg("git stdout pipe missing"))?;
+        let mut stderr =
+            child.stderr.take().ok_or_else(|| Error::msg("git stderr pipe missing"))?;
+        let stdout_handle = thread::spawn(move || {
+            let mut buf = Vec::new();
+            stdout.read_to_end(&mut buf).map(|_| buf)
+        });
+        let stderr_handle = thread::spawn(move || {
+            let mut buf = Vec::new();
+            stderr.read_to_end(&mut buf).map(|_| buf)
+        });
+        let status = wait_with_timeout(&mut child, args)?;
+        let stdout_bytes = stdout_handle
+            .join()
+            .map_err(|_| Error::msg("git stdout reader panicked"))?
+            .map_err(|e| Error::msg(format!("failed to read git stdout: {e}")))?;
+        let stderr_bytes = stderr_handle
+            .join()
+            .map_err(|_| Error::msg("git stderr reader panicked"))?
+            .map_err(|e| Error::msg(format!("failed to read git stderr: {e}")))?;
+        if status.success() {
+            return Ok(String::from_utf8_lossy(&stdout_bytes).into_owned());
         }
-        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stderr = String::from_utf8_lossy(&stderr_bytes);
         Err(Error::msg(format!(
             "git {} failed: {}",
             args.join(" "),
             stderr.trim()
         )))
+    }
+}
+
+fn wait_with_timeout(child: &mut std::process::Child, args: &[&str]) -> Result<ExitStatus> {
+    let started = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) if started.elapsed() >= GIT_TIMEOUT => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(Error::msg(format!(
+                    "git {} timed out after {}s",
+                    args.join(" "),
+                    GIT_TIMEOUT.as_secs()
+                )));
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(50)),
+            Err(e) => {
+                return Err(Error::msg(format!("failed to wait for git: {e}")));
+            }
+        }
     }
 }
 

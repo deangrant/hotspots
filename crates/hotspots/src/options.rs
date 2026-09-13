@@ -3,6 +3,9 @@
 //! Under [`Grain::Function`], entities are `relative/path.rs::symbol`, where
 //! `symbol` is a function name or `Type::method`. File grain keeps path entities.
 
+/// Absolute upper bound for `--max-changeset-size` / [`Options::max_changeset_size`].
+pub const MAX_CHANGESET_SIZE_LIMIT: usize = 200;
+
 /// Optional same-day commit merging for coupling-style metrics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TemporalPeriod {

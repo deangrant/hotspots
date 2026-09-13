@@ -6,6 +6,7 @@
 #![doc(html_no_source)]
 
 pub mod analysis;
+pub mod date;
 pub mod error;
 pub mod filter;
 pub mod group;
@@ -27,7 +28,7 @@ pub use error::{Error, Result};
 #[doc(inline)]
 pub use model::Change;
 #[doc(inline)]
-pub use options::{Grain, Options, TemporalPeriod};
+pub use options::{Grain, MAX_CHANGESET_SIZE_LIMIT, Options, TemporalPeriod};
 #[doc(inline)]
 pub use output::{OutputFormat, write_json, write_table, write_text};
 #[doc(inline)]

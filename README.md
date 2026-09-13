@@ -34,8 +34,10 @@ git log --pretty=format:'[%h] %aN %ad %s' --date=short --numstat \
   --after=YYYY-MM-DD > logfile.log
 ```
 
-Prefer `--no-renames` so paths stay comparable across commits. Limit history with
-`--after` so recent maintenance questions are not drowned by old data.
+Prefer `--no-renames` so paths stay comparable across commits (rename numstat
+lines are rejected). Limit history with `--after` so recent maintenance
+questions are not drowned by old data. Logs are capped at one million change
+rows.
 
 ## File vs function grain
 
