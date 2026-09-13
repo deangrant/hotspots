@@ -1,7 +1,7 @@
 //! Command-line argument parsing for the hotspots binary.
 
 use hotspots::{
-    Grain, MAX_CHANGESET_SIZE_LIMIT, Options, OutputFormat, TemporalPeriod, analysis_names,
+    Grain, MAX_CHANGESET_SIZE_LIMIT, Options, OutputFormat, TemporalPeriod, analysis_names, date,
 };
 
 /// Parsed CLI invocation.
@@ -318,6 +318,10 @@ fn validate(parsed: &Args) -> Result<(), String> {
             "`--max-changeset-size` must be at most {MAX_CHANGESET_SIZE_LIMIT}"
         ));
     }
+    if let Some(raw) = parsed.options.age_time_now.as_deref() {
+        date::parse_date(raw)
+            .map_err(|_| format!("invalid `--age-time-now` `{raw}`; expected `YYYY-MM-DD`"))?;
+    }
     Ok(())
 }
 
@@ -425,6 +429,12 @@ mod tests {
         assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-a", "nope"])).is_err());
         assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-i", "80", "-x", "20"])).is_err());
         assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-s", "201"])).is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_age_time_now() {
+        assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-d", "not-a-date"])).is_err());
+        assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-d", "2024-01-02"])).is_ok());
     }
 
     #[test]

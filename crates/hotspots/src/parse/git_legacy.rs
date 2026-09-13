@@ -118,4 +118,20 @@ mod tests {
         assert!(GitLegacyParser.parse(&mut Cursor::new("[abc]Ada2024-01-01 no-space")).is_err());
         assert!(GitLegacyParser.parse(&mut Cursor::new("[abc] short")).is_err());
     }
+
+    /// First ISO date token is the commit date, even when it appears in the author field.
+    #[test]
+    fn first_iso_date_token_wins_when_author_contains_date() {
+        let log = "\
+[abc123] Ada 2024-01-01 Fan 2024-01-02 subject here
+1\t0\ta.rs
+";
+        let parsed = GitLegacyParser.parse(&mut Cursor::new(log.as_bytes()));
+        assert!(parsed.is_ok(), "{:?}", parsed.err());
+        let changes = parsed.unwrap_or_default();
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].author, "Ada");
+        assert_eq!(changes[0].date, "2024-01-01");
+        assert_eq!(changes[0].entity, "a.rs");
+    }
 }
