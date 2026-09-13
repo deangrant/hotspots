@@ -27,7 +27,7 @@ pub trait VcsParser {
 ///
 /// # Errors
 ///
-/// Returns an error when the VCS name is unknown or not yet supported.
+/// Returns an error when the VCS name is unknown.
 pub fn parser_for(vcs: &str) -> Result<Box<dyn VcsParser>> {
     if let Some(parser) = known_parser(vcs) {
         return Ok(parser);
@@ -44,16 +44,7 @@ fn known_parser(vcs: &str) -> Option<Box<dyn VcsParser>> {
 }
 
 fn unsupported_vcs(vcs: &str) -> Error {
-    if is_planned_vcs(vcs) {
-        return Error::msg(format!(
-            "vcs `{vcs}` is not supported yet; use `git` or `git2`"
-        ));
-    }
-    Error::msg(format!("unknown vcs `{vcs}`; expected `git` or `git2`"))
-}
-
-fn is_planned_vcs(vcs: &str) -> bool {
-    ["svn", "hg", "p4", "tfs"].contains(&vcs)
+    Error::parse(format!("unknown vcs `{vcs}`; expected `git` or `git2`"))
 }
 
 /// Maximum change rows retained from a single log parse.
@@ -201,7 +192,7 @@ mod tests {
         assert!(parser_for("git").is_ok());
         assert!(parser_for("git2").is_ok());
         let svn = unsupported_vcs("svn").to_string();
-        assert!(svn.contains("not supported yet"));
+        assert!(svn.contains("unknown vcs"));
         let weird = unsupported_vcs("zzz").to_string();
         assert!(weird.contains("unknown vcs"));
     }

@@ -56,10 +56,15 @@ fn rust_keys(changes: &[Change]) -> BTreeSet<(String, String)> {
         .collect()
 }
 
+struct CachedBlobErr {
+    message: String,
+    missing_path: bool,
+}
+
 struct BlobCache<'a> {
     git: &'a dyn GitRunner,
     repo: &'a Path,
-    blobs: HashMap<(String, String), std::result::Result<String, String>>,
+    blobs: HashMap<(String, String), std::result::Result<String, CachedBlobErr>>,
 }
 
 impl<'a> BlobCache<'a> {
@@ -76,16 +81,27 @@ impl<'a> BlobCache<'a> {
         if let Some(cached) = self.blobs.get(&key) {
             return match cached {
                 Ok(src) => Ok(src.clone()),
-                Err(msg) => Err(Error::msg(msg.clone())),
+                Err(err) => Err(cached_blob_error(err)),
             };
         }
         let result = show_blob(self.git, self.repo, rev, path);
         let stored = match &result {
             Ok(src) => Ok(src.clone()),
-            Err(err) => Err(err.to_string()),
+            Err(err) => Err(CachedBlobErr {
+                message: err.to_string(),
+                missing_path: err.is_git_missing_path(),
+            }),
         };
         self.blobs.insert(key, stored);
         result
+    }
+}
+
+fn cached_blob_error(err: &CachedBlobErr) -> Error {
+    if err.missing_path {
+        Error::git_missing_path(err.message.clone())
+    } else {
+        Error::git(err.message.clone())
     }
 }
 
@@ -179,9 +195,12 @@ mod tests {
                 return Ok(out.clone());
             }
             if let Some(msg) = self.err.get(&key) {
-                return Err(Error::msg(msg.clone()));
+                if msg.to_ascii_lowercase().contains("does not exist") {
+                    return Err(Error::git_missing_path(msg.clone()));
+                }
+                return Err(Error::git(msg.clone()));
             }
-            Err(Error::msg(format!("unexpected git args: {key}")))
+            Err(Error::git(format!("unexpected git args: {key}")))
         }
     }
 

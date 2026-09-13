@@ -24,7 +24,7 @@ mod coverage_tests;
 #[doc(inline)]
 pub use analysis::{Table, analysis_names};
 #[doc(inline)]
-pub use error::{Error, Result};
+pub use error::{Error, ErrorKind, Result};
 #[doc(inline)]
 pub use model::Change;
 #[doc(inline)]

@@ -125,8 +125,7 @@ fn set_min_revs(
     flag: &str,
     parsed: &mut Args,
 ) -> Result<usize, String> {
-    parsed.options.min_revs = parse_int(require_value(argv, index, flag)?, flag)?;
-    Ok(index + 2)
+    assign_int(argv, index, flag, &mut parsed.options.min_revs)
 }
 
 fn set_min_shared_revs(
@@ -135,8 +134,7 @@ fn set_min_shared_revs(
     flag: &str,
     parsed: &mut Args,
 ) -> Result<usize, String> {
-    parsed.options.min_shared_revs = parse_int(require_value(argv, index, flag)?, flag)?;
-    Ok(index + 2)
+    assign_int(argv, index, flag, &mut parsed.options.min_shared_revs)
 }
 
 fn set_min_coupling(
@@ -145,8 +143,7 @@ fn set_min_coupling(
     flag: &str,
     parsed: &mut Args,
 ) -> Result<usize, String> {
-    parsed.options.min_coupling = parse_int(require_value(argv, index, flag)?, flag)?;
-    Ok(index + 2)
+    assign_int(argv, index, flag, &mut parsed.options.min_coupling)
 }
 
 fn set_max_coupling(
@@ -155,8 +152,7 @@ fn set_max_coupling(
     flag: &str,
     parsed: &mut Args,
 ) -> Result<usize, String> {
-    parsed.options.max_coupling = parse_int(require_value(argv, index, flag)?, flag)?;
-    Ok(index + 2)
+    assign_int(argv, index, flag, &mut parsed.options.max_coupling)
 }
 
 fn set_max_changeset_size(
@@ -165,8 +161,7 @@ fn set_max_changeset_size(
     flag: &str,
     parsed: &mut Args,
 ) -> Result<usize, String> {
-    parsed.options.max_changeset_size = parse_int(require_value(argv, index, flag)?, flag)?;
-    Ok(index + 2)
+    assign_int(argv, index, flag, &mut parsed.options.max_changeset_size)
 }
 
 fn set_age_time_now(
@@ -259,6 +254,16 @@ fn assign_optional(
     Ok(index + 2)
 }
 
+fn assign_int<T: std::str::FromStr>(
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    target: &mut T,
+) -> Result<usize, String> {
+    *target = parse_int(require_value(argv, index, flag)?, flag)?;
+    Ok(index + 2)
+}
+
 fn push_string(
     argv: &[String],
     index: usize,
@@ -316,57 +321,10 @@ fn validate(parsed: &Args) -> Result<(), String> {
     Ok(())
 }
 
-/// Help text printed for `-h/--help`.
-#[must_use]
-pub fn help_text() -> String {
-    let analyses = analysis_names().join(", ");
-    format!(
-        "\
-hotspots — mine Git history logs for maintenance metrics
-
-Usage:
-  hotspots -l <logfile> -c <git|git2> [options]
-
-Options:
-  -l, --log PATH                 VCS log file (required)
-  -c, --vcs git|git2             Log format (required)
-  -a, --analysis NAME            Analysis to run (default: risk)
-  -r, --rows N                   Max output rows
-  -n, --min-revs N               Min revisions per entity (default: 5)
-  -m, --min-shared-revs N        Min shared revisions for coupling (default: 5)
-  -i, --min-coupling N           Min coupling degree percent (default: 30)
-  -x, --max-coupling N           Max coupling degree percent (default: 100)
-  -s, --max-changeset-size N     Max changeset size for coupling (default: 30, max: 200)
-  -d, --age-time-now YYYY-MM-DD  Reference date for age analysis
-  -t, --temporal-period day      Merge same-day commits per author
-  -g, --group FILE               Layer map (`prefix => layer` lines)
-      --exclude PREFIX           Drop matching paths (repeatable)
-      --include PREFIX           Keep only matching paths (repeatable)
-      --format text|json         Output format (default: text)
-      --grain file|function      Entity grain (default: file)
-      --repo PATH                Git work tree (required for function grain)
-  -h, --help                     Show this help
-
-Default output is an aligned terminal table. Use `--format json` for scripting.
-
-Function grain expands `*.rs` changes to `path::symbol` via git + syn using
-`--repo`. Non-Rust paths are dropped. Revisions in the log must exist in
-`--repo`. Accuracy uses per-commit symbol tables and zero-context hunk overlap
-(not HEAD-only maps). Restrict with `--include` when the log mixes languages.
-
-Analyses:
-  {analyses}
-
-Generate a preferred Git log:
-  git log --all --numstat --date=short --pretty=format:'--%h--%ad--%aN' \\
-    --no-renames --after=YYYY-MM-DD > logfile.log
-"
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::help::help_text;
 
     fn argv(args: &[&str]) -> Vec<String> {
         std::iter::once("hotspots")

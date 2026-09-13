@@ -49,7 +49,8 @@ Revisions in the log must exist in `--repo`. Attribution uses **per-commit**
 symbol tables (`git show REV:PATH`) and **zero-context hunk overlap**
 (`git show`/`diff-tree -U0`), not a HEAD-only map applied to numstat totals.
 Deleted or renamed-away paths load symbols from the parent blob (`REV^:PATH`);
-missing on both sides still fails closed.
+missing on both sides still fails closed. The `git` binary is taken from
+`PATH`, or from `GIT_EXECUTABLE` when that environment variable is set.
 
 Non-Rust paths are **dropped** under function grain (a stderr note reports the
 count). Changes whose hunks miss all `fn`/`impl` symbols (typical crate roots
@@ -77,6 +78,10 @@ cargo run -p hotspots-cli -- -l logfile.log -c git2 \
 
 # Authors per entity
 cargo run -p hotspots-cli -- -l logfile.log -c git2 -a authors -n 5
+
+# Ownership share and main developer (also gated by -n/--min-revs)
+cargo run -p hotspots-cli -- -l logfile.log -c git2 -a entity-ownership -n 5
+cargo run -p hotspots-cli -- -l logfile.log -c git2 -a communication -n 5
 
 # Logical coupling
 cargo run -p hotspots-cli -- -l logfile.log -c git2 -a coupling

@@ -1,6 +1,7 @@
 //! Command-line entry point for Git history maintenance metrics.
 
 mod args;
+mod help;
 
 use std::fs::File;
 use std::io::{self, BufReader, Write};
@@ -9,7 +10,8 @@ use std::process::ExitCode;
 use hotspots::{ExpandStats, Grain, SymbolResolver, analyze_log_with_resolver, write_table};
 use hotspots_rs::RustGitSynResolver;
 
-use crate::args::{Args, help_text, parse_args};
+use crate::args::{Args, parse_args};
+use crate::help::help_text;
 
 fn main() -> ExitCode {
     exit_from(run_with_args(&std::env::args().collect::<Vec<_>>()))
