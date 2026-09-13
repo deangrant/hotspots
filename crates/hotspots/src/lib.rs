@@ -15,6 +15,7 @@ pub mod options;
 pub mod output;
 pub mod parse;
 pub mod pipeline;
+pub mod symbols;
 
 #[cfg(test)]
 mod coverage_tests;
@@ -26,8 +27,10 @@ pub use error::{Error, Result};
 #[doc(inline)]
 pub use model::Change;
 #[doc(inline)]
-pub use options::{Options, TemporalPeriod};
+pub use options::{Grain, Options, TemporalPeriod};
 #[doc(inline)]
 pub use output::{OutputFormat, write_json, write_table, write_text};
 #[doc(inline)]
-pub use pipeline::analyze_log;
+pub use pipeline::{analyze_log, analyze_log_with_resolver};
+#[doc(inline)]
+pub use symbols::{ExpandStats, SymbolResolver};

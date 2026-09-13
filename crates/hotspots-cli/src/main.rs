@@ -6,7 +6,8 @@ use std::fs::File;
 use std::io::{self, BufReader, Write};
 use std::process::ExitCode;
 
-use hotspots::{analyze_log, write_table};
+use hotspots::{ExpandStats, Grain, SymbolResolver, analyze_log_with_resolver, write_table};
+use hotspots_rs::RustGitSynResolver;
 
 use crate::args::{Args, help_text, parse_args};
 
@@ -51,11 +52,39 @@ fn print_help() {
 fn execute(parsed: &Args) -> Result<(), String> {
     let file = File::open(&parsed.log).map_err(|e| format!("cannot open log: {e}"))?;
     let mut reader = BufReader::new(file);
-    let table =
-        analyze_log(&mut reader, &parsed.vcs, &parsed.options).map_err(|e| e.to_string())?;
+    let (table, stats) = run_analysis(parsed, &mut reader)?;
+    note_dropped_paths(stats);
     let mut stdout = io::stdout().lock();
     write_table(&mut stdout, &table, parsed.format).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+fn run_analysis(
+    parsed: &Args,
+    reader: &mut BufReader<File>,
+) -> Result<(hotspots::Table, ExpandStats), String> {
+    let resolver = function_resolver(parsed.options.grain);
+    let resolver_ref: Option<&dyn SymbolResolver> = resolver.as_ref().map(|r| r as _);
+    analyze_log_with_resolver(reader, &parsed.vcs, &parsed.options, resolver_ref)
+        .map_err(|e| e.to_string())
+}
+
+const fn function_resolver(grain: Grain) -> Option<RustGitSynResolver> {
+    match grain {
+        Grain::File => None,
+        Grain::Function => Some(RustGitSynResolver::new()),
+    }
+}
+
+fn note_dropped_paths(stats: ExpandStats) {
+    if stats.dropped_non_rust == 0 {
+        return;
+    }
+    let _ = writeln!(
+        io::stderr(),
+        "note: dropped {} non-Rust path(s) under --grain function",
+        stats.dropped_non_rust
+    );
 }
 
 #[cfg(test)]
@@ -120,6 +149,20 @@ mod tests {
             String::from("/no/such/hotspots.log"),
             String::from("-c"),
             String::from("git2"),
+        ];
+        assert!(run_with_args(&argv).is_err());
+    }
+
+    #[test]
+    fn function_grain_without_repo_fails_parse() {
+        let argv = vec![
+            String::from("hotspots"),
+            String::from("-l"),
+            String::from("x.log"),
+            String::from("-c"),
+            String::from("git2"),
+            String::from("--grain"),
+            String::from("function"),
         ];
         assert!(run_with_args(&argv).is_err());
     }

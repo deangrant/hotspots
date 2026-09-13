@@ -37,6 +37,25 @@ git log --pretty=format:'[%h] %aN %ad %s' --date=short --numstat \
 Prefer `--no-renames` so paths stay comparable across commits. Limit history with
 `--after` so recent maintenance questions are not drowned by old data.
 
+## File vs function grain
+
+`--grain file` (default) treats each path in the numstat log as one entity.
+
+`--grain function` expands Rust (`*.rs`) changes to `path::symbol` entities
+(function names and `Type::method`) using a Git work tree (`--repo`) plus `syn`.
+Revisions in the log must exist in `--repo`. Attribution uses **per-commit**
+symbol tables (`git show REV:PATH`) and **zero-context hunk overlap**
+(`git show`/`diff-tree -U0`), not a HEAD-only map applied to numstat totals.
+
+Non-Rust paths are **dropped** under function grain (a stderr note reports the
+count). Use `--include` to restrict the log to Rust trees when mixed languages
+are present. Failures (missing repo, git errors, unparsable `.rs`) abort the run;
+there is no silent fallback to file grain.
+
+```bash
+hotspots -l logfile.log -c git2 --grain function --repo . -n 1 -r 20
+```
+
 ## Examples
 
 ```bash
@@ -45,6 +64,10 @@ cargo run -p hotspots-cli -- -l logfile.log -c git2 -n 1 -r 20
 
 # Same results as JSON for scripting
 cargo run -p hotspots-cli -- -l logfile.log -c git2 -n 1 -r 20 --format json
+
+# Function-level risk for Rust symbols
+cargo run -p hotspots-cli -- -l logfile.log -c git2 \
+  --grain function --repo . -n 1 -r 20
 
 # Authors per entity
 cargo run -p hotspots-cli -- -l logfile.log -c git2 -a authors -n 5
@@ -64,10 +87,9 @@ See `hotspots --help` for the full flag and analysis list.
 
 ## Workspace
 
-- `crates/hotspots` — library (parsers, filters, metrics, text/JSON writers)
+- `crates/hotspots` — library (parsers, filters, metrics, text/JSON writers; std-oriented)
+- `crates/hotspots-rs` — Rust function-grain resolver (`git` CLI + `syn`)
 - `crates/hotspots-cli` — thin CLI composition root
-
-Dependencies are intentionally limited to the Rust standard library.
 
 ## License
 

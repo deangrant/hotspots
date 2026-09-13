@@ -1,6 +1,6 @@
 //! Command-line argument parsing for the hotspots binary.
 
-use hotspots::{Options, OutputFormat, TemporalPeriod, analysis_names};
+use hotspots::{Grain, Options, OutputFormat, TemporalPeriod, analysis_names};
 
 /// Parsed CLI invocation.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,6 +35,8 @@ const FLAGS: &[(&[&str], FlagHandler)] = &[
     (&["--exclude"], set_exclude),
     (&["--include"], set_include),
     (&["--format"], set_format),
+    (&["--grain"], set_grain),
+    (&["--repo"], set_repo),
 ];
 
 /// Parses process arguments.
@@ -221,6 +223,20 @@ fn set_format(
     Ok(index + 2)
 }
 
+fn set_grain(
+    argv: &[String],
+    index: usize,
+    flag: &str,
+    parsed: &mut Args,
+) -> Result<usize, String> {
+    parsed.options.grain = Grain::parse(require_value(argv, index, flag)?)?;
+    Ok(index + 2)
+}
+
+fn set_repo(argv: &[String], index: usize, flag: &str, parsed: &mut Args) -> Result<usize, String> {
+    assign_optional(argv, index, flag, &mut parsed.options.repo)
+}
+
 fn assign_string(
     argv: &[String],
     index: usize,
@@ -275,6 +291,9 @@ fn validate(parsed: &Args) -> Result<(), String> {
     if parsed.vcs.is_empty() {
         return Err(String::from("missing required `-c/--vcs`"));
     }
+    if parsed.options.grain == Grain::Function && parsed.options.repo.is_none() {
+        return Err(String::from("`--grain function` requires `--repo <path>`"));
+    }
     Ok(())
 }
 
@@ -305,9 +324,16 @@ Options:
       --exclude PREFIX           Drop matching paths (repeatable)
       --include PREFIX           Keep only matching paths (repeatable)
       --format text|json         Output format (default: text)
+      --grain file|function      Entity grain (default: file)
+      --repo PATH                Git work tree (required for function grain)
   -h, --help                     Show this help
 
 Default output is an aligned terminal table. Use `--format json` for scripting.
+
+Function grain expands `*.rs` changes to `path::symbol` via git + syn using
+`--repo`. Non-Rust paths are dropped. Revisions in the log must exist in
+`--repo`. Accuracy uses per-commit symbol tables and zero-context hunk overlap
+(not HEAD-only maps). Restrict with `--include` when the log mixes languages.
 
 Analyses:
   {analyses}
@@ -415,5 +441,19 @@ mod tests {
         assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-t", "week"])).is_err());
         assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "--bogus"])).is_err());
         assert!(parse_args(&argv(&["-l"])).is_err());
+    }
+
+    #[test]
+    fn grain_defaults_to_file_and_requires_repo_for_function() {
+        let file = parse_args(&argv(&["-l", "log.txt", "-c", "git2"]));
+        assert!(file.as_ref().is_ok_and(|p| p.options.grain == Grain::File));
+        assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "--grain", "function"])).is_err());
+        let ok = parse_args(&argv(&[
+            "-l", "x", "-c", "git2", "--grain", "function", "--repo", ".",
+        ]));
+        assert!(ok.as_ref().is_ok_and(|p| {
+            p.options.grain == Grain::Function && p.options.repo.as_deref() == Some(".")
+        }));
+        assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "--grain", "layer"])).is_err());
     }
 }

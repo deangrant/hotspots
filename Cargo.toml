@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/hotspots", "crates/hotspots-cli"]
+members = ["crates/hotspots", "crates/hotspots-cli", "crates/hotspots-rs"]
 
 [workspace.package]
 edition = "2024"

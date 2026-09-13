@@ -1,12 +1,43 @@
 //! Tunables that control filtering and metric engines.
+//!
+//! Under [`Grain::Function`], entities are `relative/path.rs::symbol`, where
+//! `symbol` is a function name or `Type::method`. File grain keeps path entities.
 
 /// Optional same-day commit merging for coupling-style metrics.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TemporalPeriod {
     /// Keep each commit hash as its own changeset.
+    #[default]
     None,
     /// Merge commits that share author and calendar date.
     Day,
+}
+
+/// Entity granularity for analyses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Grain {
+    /// One entity per file path (default).
+    #[default]
+    File,
+    /// One entity per `path::symbol` after symbol resolution.
+    Function,
+}
+
+impl Grain {
+    /// Parses `file` or `function`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `raw` is not a known grain name.
+    pub fn parse(raw: &str) -> std::result::Result<Self, String> {
+        match raw {
+            "file" => Ok(Self::File),
+            "function" => Ok(Self::Function),
+            other => Err(format!(
+                "invalid grain `{other}`; expected `file` or `function`"
+            )),
+        }
+    }
 }
 
 /// Analysis selection and thresholds.
@@ -36,6 +67,10 @@ pub struct Options {
     pub exclude: Vec<String>,
     /// Optional layer map file path.
     pub group_file: Option<String>,
+    /// Entity granularity.
+    pub grain: Grain,
+    /// Git repository path required for [`Grain::Function`].
+    pub repo: Option<String>,
 }
 
 impl Default for Options {
@@ -53,6 +88,8 @@ impl Default for Options {
             include: Vec::new(),
             exclude: Vec::new(),
             group_file: None,
+            grain: Grain::File,
+            repo: None,
         }
     }
 }
