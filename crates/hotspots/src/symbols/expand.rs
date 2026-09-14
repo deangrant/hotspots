@@ -94,12 +94,7 @@ fn attribute_hunk(
     let added_lines = line_span(hunk.new_start, hunk.new_count);
     let deleted_lines = line_span(hunk.old_start, hunk.old_count);
     add_overlap_counts(symbols_new, &added_lines, true, totals);
-    let old_syms = if symbols_old.is_empty() {
-        symbols_new
-    } else {
-        symbols_old
-    };
-    add_overlap_counts(old_syms, &deleted_lines, false, totals);
+    add_overlap_counts(symbols_old, &deleted_lines, false, totals);
 }
 
 fn line_span(start: u32, count: u32) -> Vec<u32> {
@@ -272,5 +267,23 @@ mod tests {
         };
         let rows = expand_file_change(&change, &diff);
         assert!(rows.iter().any(|r| r.entity == "a.rs::bar" && r.deleted == Some(2)));
+    }
+
+    #[test]
+    fn empty_old_symbols_do_not_attribute_deletes_to_new() {
+        let change = Change::new("abc", "Ada", "2024-01-01", "a.rs", Some(0), Some(2));
+        let diff = FileDiff {
+            rev: String::from("abc"),
+            path: String::from("a.rs"),
+            symbols_new: vec![fact("foo", 1, 10)],
+            symbols_old: vec![],
+            hunks: vec![Hunk {
+                old_start: 1,
+                old_count: 2,
+                new_start: 0,
+                new_count: 0,
+            }],
+        };
+        assert!(expand_file_change(&change, &diff).is_empty());
     }
 }

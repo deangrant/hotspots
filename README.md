@@ -89,9 +89,13 @@ git log --all --numstat --date=short --pretty=format:'--%h--%ad--%aN' \
 ### Legacy format (`-c git`)
 
 ```bash
-git log --pretty=format:'[%h] %aN %ad %s' --date=short --numstat \
+git log --pretty=format:'[%h] %aN <%ad> %s' --date=short --numstat \
   --after=YYYY-MM-DD > logfile.log
 ```
+
+Angle brackets around `%ad` keep author names that contain date-like tokens
+unambiguous. Older undelimited logs (`[%h] %aN %ad %s`) still parse by taking
+the first `YYYY-MM-DD` token. Prefer `-c git2` when you can re-export.
 
 Use `--no-renames` so paths stay comparable across commits. The tool rejects
 rename-style numstat lines. Logs are capped at **one million** change rows.
@@ -208,7 +212,7 @@ missing.
 | `-t`, `--temporal-period day` | Merge same-day commits per author for coupling, SOC, and risk’s revision-based inputs (revs, SOC, fragmentation); churn stays total lines | off |
 | `-g`, `--group FILE` | Layer map (`prefix => layer` lines) | unset |
 | `--exclude PREFIX` | Drop matching paths (repeatable) | none |
-| `--include PREFIX` | Keep only matching paths (repeatable) | none |
+| `--include PREFIX` | Keep only matching nonempty path prefixes (repeatable) | none |
 | `--format text\|json` | Output format | `text` |
 | `--grain file\|function` | Entity grain | `file` |
 | `--repo PATH` | Git work tree (required for function grain) | unset |

@@ -136,6 +136,13 @@ fn rejects_invalid_age_time_now() {
 }
 
 #[test]
+fn rejects_empty_include_prefixes() {
+    assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "--include", ""])).is_err());
+    assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "--include", "/"])).is_err());
+    assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "--include", "   "])).is_err());
+}
+
+#[test]
 fn grain_defaults_to_file_and_requires_repo_for_function() {
     let file = parse_args(&argv(&["-l", "log.txt", "-c", "git2"]));
     assert!(file.as_ref().is_ok_and(|p| p.options.grain == Grain::File));

@@ -32,7 +32,7 @@ git log --all --numstat --date=short --pretty=format:'--%h--%ad--%aN' \
 Legacy format (`-c git`):
 
 ```bash
-git log --pretty=format:'[%h] %aN %ad %s' --date=short --numstat \
+git log --pretty=format:'[%h] %aN <%ad> %s' --date=short --numstat \
   --after=YYYY-MM-DD > logfile.log
 ```
 
@@ -40,6 +40,7 @@ git log --pretty=format:'[%h] %aN %ad %s' --date=short --numstat \
   rejected).
 - Limit with `--after` so recent questions are not drowned by old data.
 - Logs are capped at one million change rows.
+- `--include` prefixes must be nonempty after trim (empty/`/` are rejected).
 
 ## Grain
 

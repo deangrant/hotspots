@@ -19,7 +19,12 @@ fn validate_options(parsed: &Args) -> Result<(), String> {
     require_known_analysis(parsed)?;
     require_coupling_bounds(parsed)?;
     require_changeset_limit(parsed)?;
-    require_age_time_now(parsed)
+    require_age_time_now(parsed)?;
+    require_include_prefixes(parsed)
+}
+
+fn require_include_prefixes(parsed: &Args) -> Result<(), String> {
+    hotspots::filter::ensure_include_prefixes(&parsed.options.include).map_err(|e| e.to_string())
 }
 
 fn require_non_empty(value: &str, flag: &str) -> Result<(), String> {

@@ -44,7 +44,7 @@ fn analyze_with_parser(
     resolver: Option<&dyn SymbolResolver>,
 ) -> Result<(Table, ExpandStats)> {
     let changes = parser.parse(input)?;
-    let filtered = PathFilter::new(opts.include.clone(), opts.exclude.clone()).apply(changes);
+    let filtered = PathFilter::try_new(opts.include.clone(), opts.exclude.clone())?.apply(changes);
     let repo = opts.repo.as_deref().map(Path::new);
     let (expanded, stats) = apply_grain(filtered, opts.grain, repo, resolver)?;
     let grouped = apply_grouping(expanded, opts)?;

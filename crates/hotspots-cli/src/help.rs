@@ -27,7 +27,7 @@ Options:
   -t, --temporal-period day      Merge same-day commits per author (coupling, SOC, risk)
   -g, --group FILE               Layer map (`prefix => layer` lines)
       --exclude PREFIX           Drop matching paths (repeatable)
-      --include PREFIX           Keep only matching paths (repeatable)
+      --include PREFIX           Keep only matching nonempty path prefixes (repeatable)
       --format text|json         Output format (default: text)
       --grain file|function      Entity grain (default: file)
       --repo PATH                Git work tree (required for function grain)

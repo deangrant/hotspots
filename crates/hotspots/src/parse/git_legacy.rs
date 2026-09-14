@@ -42,14 +42,47 @@ fn parse_legacy_body(
     rest: &str,
     line: &str,
 ) -> Result<Option<(String, String, String)>> {
+    if let Some((author, date)) = split_delimited_date(rest) {
+        return finish_header(rev, author, date, line);
+    }
     let date_at = find_iso_date(rest)
         .ok_or_else(|| Error::msg(format!("legacy header missing date: {line}")))?;
     let author = rest[..date_at].trim();
+    let date = &rest[date_at..date_at + 10];
+    finish_header(rev, author, date, line)
+}
+
+fn finish_header(
+    rev: &str,
+    author: &str,
+    date: &str,
+    line: &str,
+) -> Result<Option<(String, String, String)>> {
     if author.is_empty() {
         return Err(Error::msg(format!("legacy header missing author: {line}")));
     }
-    let date = &rest[date_at..date_at + 10];
     Ok(Some((rev.to_owned(), author.to_owned(), date.to_owned())))
+}
+
+/// Splits `author <YYYY-MM-DD> subject` when an angle-bracket ISO date is present.
+fn split_delimited_date(rest: &str) -> Option<(&str, &str)> {
+    let open = rest.find('<')?;
+    let after_open = open + 1;
+    let close = rest[after_open..].find('>')? + after_open;
+    let date = &rest[after_open..close];
+    if date.len() != 10 || !is_iso_date_at(date.as_bytes(), 0) {
+        return None;
+    }
+    let before = &rest.as_bytes()[..open];
+    let after = rest.as_bytes().get(close + 1).copied();
+    if !boundary_byte(before.last().copied()) || !boundary_byte(after) {
+        return None;
+    }
+    Some((rest[..open].trim(), date))
+}
+
+fn boundary_byte(byte: Option<u8>) -> bool {
+    byte.is_none_or(|b| b.is_ascii_whitespace())
 }
 
 fn find_iso_date(text: &str) -> Option<usize> {
@@ -120,20 +153,64 @@ mod tests {
         assert!(GitLegacyParser.parse(&mut Cursor::new("[abc] short")).is_err());
     }
 
-    /// First ISO date token is the commit date, even when it appears in the author field.
     #[test]
-    fn first_iso_date_token_wins_when_author_contains_date() {
+    fn delimited_date_keeps_date_like_author_names() {
         let log = "\
-[abc123] Ada 2024-01-01 Fan 2024-01-02 subject here
+[abc123] Ada 2024-01-01 Fan <2024-01-02> subject here
 1\t0\ta.rs
 ";
         let parsed = GitLegacyParser.parse(&mut Cursor::new(log.as_bytes()));
         assert!(matches!(
             &parsed,
             Ok(c) if c.len() == 1
-                && c[0].author == "Ada"
-                && c[0].date == "2024-01-01"
+                && c[0].author == "Ada 2024-01-01 Fan"
+                && c[0].date == "2024-01-02"
                 && c[0].entity == "a.rs"
+        ));
+    }
+
+    #[test]
+    fn undelimited_subject_date_keeps_first_iso_token() {
+        let log = "\
+[abc123] Ada Lovelace 2024-01-02 fixed 2023-12-01 regression
+1\t0\ta.rs
+";
+        let parsed = GitLegacyParser.parse(&mut Cursor::new(log.as_bytes()));
+        assert!(matches!(
+            &parsed,
+            Ok(c) if c.len() == 1
+                && c[0].author == "Ada Lovelace"
+                && c[0].date == "2024-01-02"
+        ));
+    }
+
+    #[test]
+    fn ignores_non_iso_angle_brackets() {
+        let log = "\
+[abc123] Ada <not-a-date> 2024-01-02 subject
+1\t0\ta.rs
+";
+        let parsed = GitLegacyParser.parse(&mut Cursor::new(log.as_bytes()));
+        assert!(matches!(
+            &parsed,
+            Ok(c) if c.len() == 1
+                && c[0].author == "Ada <not-a-date>"
+                && c[0].date == "2024-01-02"
+        ));
+    }
+
+    #[test]
+    fn glued_angle_date_falls_back_to_bare_iso() {
+        let log = "\
+[abc123] Ada<2024-01-01>Fan 2024-01-02 subject
+1\t0\ta.rs
+";
+        let parsed = GitLegacyParser.parse(&mut Cursor::new(log.as_bytes()));
+        assert!(matches!(
+            &parsed,
+            Ok(c) if c.len() == 1
+                && c[0].author == "Ada<2024-01-01>Fan"
+                && c[0].date == "2024-01-02"
         ));
     }
 }
