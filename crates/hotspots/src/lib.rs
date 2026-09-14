@@ -16,6 +16,7 @@ pub mod model;
 pub mod options;
 pub mod output;
 pub mod parse;
+mod path_prefix;
 pub mod pipeline;
 pub mod symbols;
 

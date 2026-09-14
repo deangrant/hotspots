@@ -46,7 +46,8 @@ not attributed. Non-Rust paths are dropped. Revisions in the log must exist in
 Layer maps try rules in file order (first match wins; put specific prefixes
 first). Unmatched paths keep their names. `main-dev` ownership is share of
 added lines and omits entities with no additions (`main-dev-by-revs` for
-delete-only).
+delete-only). `communication` ranks author pairs by co-touched entities, not
+messages or PRs.
 
 Analyses:
   {analyses}

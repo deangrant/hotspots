@@ -55,7 +55,7 @@ impl LayerMap {
     fn layer_for(&self, path: &str) -> Option<String> {
         self.rules
             .iter()
-            .find(|(prefix, _)| matches_prefix(path, prefix))
+            .find(|(prefix, _)| crate::path_prefix::matches_prefix(path, prefix))
             .map(|(_, layer)| layer.clone())
     }
 }
@@ -104,10 +104,6 @@ fn ensure_nonempty_rule(prefix: &str, layer: &str, line: &str) -> Result<()> {
         return Err(Error::msg(format!("empty group rule: {line}")));
     }
     Ok(())
-}
-
-fn matches_prefix(path: &str, prefix: &str) -> bool {
-    path == prefix || path.strip_prefix(prefix).is_some_and(|rest| rest.starts_with('/'))
 }
 
 #[cfg(test)]

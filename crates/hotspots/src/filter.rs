@@ -27,13 +27,19 @@ impl PathFilter {
     /// Returns whether `path` should be kept.
     #[must_use]
     pub fn allows(&self, path: &str) -> bool {
-        if self.exclude.iter().any(|prefix| matches_prefix(path, prefix)) {
+        if self
+            .exclude
+            .iter()
+            .any(|prefix| crate::path_prefix::matches_prefix(path, prefix))
+        {
             return false;
         }
         if self.include.is_empty() {
             return true;
         }
-        self.include.iter().any(|prefix| matches_prefix(path, prefix))
+        self.include
+            .iter()
+            .any(|prefix| crate::path_prefix::matches_prefix(path, prefix))
     }
 
     /// Keeps only changes whose entity paths pass the filter.
@@ -61,13 +67,6 @@ fn normalize_all(prefixes: Vec<String>) -> Vec<String> {
 
 fn normalize_prefix(prefix: &str) -> String {
     prefix.trim().trim_end_matches('/').to_owned()
-}
-
-fn matches_prefix(path: &str, prefix: &str) -> bool {
-    if prefix.is_empty() {
-        return false;
-    }
-    path == prefix || path.strip_prefix(prefix).is_some_and(|rest| rest.starts_with('/'))
 }
 
 #[cfg(test)]

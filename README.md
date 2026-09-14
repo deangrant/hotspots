@@ -191,7 +191,7 @@ a sample table and column guide.
 | `entity-effort` | Author revisions versus total revisions per entity |
 | `main-dev-by-revs` | Main developer by revision count per entity |
 | `fragmentation` | Ownership fragmentation (`1 - sum(share²)`) |
-| `communication` | How many entities pairs of authors both touched |
+| `communication` | Author pairs ranked by count of co-touched entities (not messages/PRs) |
 | `age` | Days since each entity’s most recent change (see `-d`) |
 
 Several ranking analyses respect `-n` / `--min-revs` (default **5**). Coupling

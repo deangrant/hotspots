@@ -1,4 +1,4 @@
-//! Author communication via shared entities.
+//! Author pairs ranked by shared-entity co-touch (not messages or PRs).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -9,7 +9,7 @@ use crate::analysis::util::{
 use crate::model::Change;
 use crate::options::Options;
 
-/// Counts how many entities pairs of authors both touched.
+/// Counts how many entities each author pair both touched (co-touch overlap).
 pub fn run(changes: &[Change], opts: &Options) -> Table {
     let shared = shared_pair_counts(changes, opts);
     build_communication_table(shared, opts.rows)

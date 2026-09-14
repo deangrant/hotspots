@@ -75,10 +75,21 @@ fn apply_flag(
     parsed: &mut Args,
 ) -> Result<usize, String> {
     mark_seen_if_scalar(kind, flag, parsed)?;
-    match (kind as usize) / 6 {
-        0 => apply_low(kind, argv, index, flag, parsed),
-        1 => apply_mid(kind, argv, index, flag, parsed),
-        _ => apply_high(kind, argv, index, flag, parsed),
+    match kind {
+        Flag::Log | Flag::Vcs | Flag::Analysis => apply_slot_0_2(kind, argv, index, flag, parsed),
+        Flag::Rows | Flag::MinRevs | Flag::MinSharedRevs => {
+            apply_slot_3_5(kind, argv, index, flag, parsed)
+        }
+        Flag::MinCoupling | Flag::MaxCoupling | Flag::MaxChangesetSize => {
+            apply_slot_6_8(kind, argv, index, flag, parsed)
+        }
+        Flag::AgeTimeNow | Flag::TemporalPeriod | Flag::Group => {
+            apply_slot_9_11(kind, argv, index, flag, parsed)
+        }
+        Flag::Exclude | Flag::Include | Flag::Format => {
+            apply_slot_12_14(kind, argv, index, flag, parsed)
+        }
+        Flag::Grain | Flag::Repo => apply_slot_15_17(kind, argv, index, flag, parsed),
     }
 }
 
@@ -92,48 +103,6 @@ fn mark_seen_if_scalar(kind: Flag, flag: &str, parsed: &mut Args) -> Result<(), 
     }
     parsed.seen_flags |= bit;
     Ok(())
-}
-
-fn apply_low(
-    kind: Flag,
-    argv: &[String],
-    index: usize,
-    flag: &str,
-    parsed: &mut Args,
-) -> Result<usize, String> {
-    if (kind as usize) < 3 {
-        apply_slot_0_2(kind, argv, index, flag, parsed)
-    } else {
-        apply_slot_3_5(kind, argv, index, flag, parsed)
-    }
-}
-
-fn apply_mid(
-    kind: Flag,
-    argv: &[String],
-    index: usize,
-    flag: &str,
-    parsed: &mut Args,
-) -> Result<usize, String> {
-    if (kind as usize) >= 9 {
-        return apply_slot_9_11(kind, argv, index, flag, parsed);
-    }
-    apply_slot_6_8(kind, argv, index, flag, parsed)
-}
-
-fn apply_high(
-    kind: Flag,
-    argv: &[String],
-    index: usize,
-    flag: &str,
-    parsed: &mut Args,
-) -> Result<usize, String> {
-    let use_top = (kind as usize) >= 15;
-    if use_top {
-        apply_slot_15_17(kind, argv, index, flag, parsed)
-    } else {
-        apply_slot_12_14(kind, argv, index, flag, parsed)
-    }
 }
 
 pub(super) fn apply_slot_0_2(
