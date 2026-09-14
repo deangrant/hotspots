@@ -139,11 +139,7 @@ fn load_parsed_hunks(
         Ok(unified) => unified,
         Err(err) => return Err(hunks_load_err(path, rev, &err)),
     };
-    let hunks = parse_hunks(&unified);
-    if hunks.is_empty() {
-        return Err(Error::msg(format!("no hunks for `{path}` at `{rev}`")));
-    }
-    Ok(hunks)
+    Ok(parse_hunks(&unified))
 }
 
 fn hunks_load_err(path: &str, rev: &str, err: &Error) -> Error {
@@ -353,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_empty_hunk_patch() {
+    fn drops_empty_hunk_patch() {
         let mut ok = work_tree_ok();
         ok.insert(
             String::from("show xyz:a.rs"),
@@ -375,7 +371,7 @@ mod tests {
         assert!(
             resolver
                 .expand(&[change("xyz", Some(1), Some(0))], Path::new("/repo"))
-                .is_err_and(|e| e.to_string().contains("no hunks"))
+                .is_ok_and(|(rows, stats)| rows.is_empty() && stats.dropped_no_overlap == 1)
         );
     }
 

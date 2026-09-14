@@ -135,8 +135,9 @@ totals.
 
 Deleted or renamed-away paths load symbols from the parent blob (`REV^:PATH`).
 If the path is missing on both sides, the run **fails closed**. Non-Rust paths
-are **dropped** (stderr reports the count). Changes whose hunks miss all
-`fn` / `impl` symbols are also dropped with a stderr count.
+are **dropped** (stderr reports the count). Changes with no line hunks (for
+example mode-only diffs) or whose hunks miss all `fn` / `impl` symbols are also
+dropped with a stderr count.
 
 Failures (missing `--repo`, git errors, unparsable `.rs`) **abort** the run.
 There is no silent fallback to file grain. Restrict mixed-language logs with

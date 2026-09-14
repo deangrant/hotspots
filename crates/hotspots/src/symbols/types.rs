@@ -10,7 +10,7 @@ use crate::model::Change;
 pub struct ExpandStats {
     /// File changes dropped because the path was not Rust.
     pub dropped_non_rust: u64,
-    /// Rust file changes dropped because hunks overlapped no symbols.
+    /// Rust file changes dropped because hunks were empty or overlapped no symbols.
     pub dropped_no_overlap: u64,
 }
 

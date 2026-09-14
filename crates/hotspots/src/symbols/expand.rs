@@ -8,8 +8,8 @@ use crate::symbols::types::{ExpandStats, FileDiff, Hunk, SymbolFact, entity_id};
 
 /// Expands each change using the matching [`FileDiff`] keyed by `(rev, path)`.
 ///
-/// Rust paths whose hunks overlap no symbols are dropped and counted in
-/// [`ExpandStats::dropped_no_overlap`].
+/// Rust paths whose hunks are empty or overlap no symbols are dropped and
+/// counted in [`ExpandStats::dropped_no_overlap`].
 ///
 /// # Errors
 ///
@@ -38,7 +38,7 @@ fn expand_one_change(
     }
     let diff = require_diff(change, diffs)?;
     let expanded = expand_file_change(change, diff);
-    if !diff.hunks.is_empty() && expanded.is_empty() {
+    if expanded.is_empty() {
         stats.dropped_no_overlap = stats.dropped_no_overlap.saturating_add(1);
     }
     out.extend(expanded);
@@ -247,6 +247,12 @@ mod tests {
             hunks: vec![],
         };
         assert!(expand_file_change(&change, &diff).is_empty());
+        let mut diffs = BTreeMap::new();
+        diffs.insert((String::from("1"), String::from("a.rs")), diff);
+        assert!(
+            expand_with_diffs(std::slice::from_ref(&change), &diffs)
+                .is_ok_and(|(rows, stats)| rows.is_empty() && stats.dropped_no_overlap == 1)
+        );
     }
 
     #[test]

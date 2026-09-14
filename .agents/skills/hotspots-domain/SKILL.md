@@ -53,8 +53,8 @@ Function grain:
 - Revisions in the log must exist in `--repo`.
 - Attribution uses **per-commit** symbol tables and **zero-context** hunk
   overlap — not a HEAD-only map.
-- Non-Rust paths are **dropped** (stderr count). Missed symbols also drop with
-  a stderr count.
+- Non-Rust paths are **dropped** (stderr count). Empty hunks and missed symbols
+  also drop with a stderr count.
 - Failures (missing repo, git errors, unparsable `.rs`) **abort**; there is no
   silent fallback to file grain.
 - Restrict with `--include` when the log mixes languages.
