@@ -6,7 +6,8 @@ use crate::analysis::effort;
 use crate::analysis::hotspots;
 use crate::analysis::soc;
 use crate::analysis::table::Table;
-use crate::analysis::util::{cmp_f64_desc, entity_revisions, fmt_pct, fmt_u64, meets_min_revs};
+use crate::analysis::util::{cmp_f64_desc, fmt_pct, fmt_u64, meets_min_revs};
+use crate::index::ChangesetIndex;
 use crate::model::Change;
 use crate::options::Options;
 
@@ -33,7 +34,7 @@ struct Components {
 
 /// Ranks entities by a 0–100 weighted maintenance-risk score.
 pub fn run(changes: &[Change], opts: &Options) -> Table {
-    let revs = entity_revisions(changes);
+    let revs = ChangesetIndex::build(changes, opts.temporal_period).entity_revisions();
     let entities = filtered_entities(&revs, opts);
     if entities.is_empty() {
         return empty_table(opts.rows);
@@ -42,7 +43,7 @@ pub fn run(changes: &[Change], opts: &Options) -> Table {
     let weights = weights_for(has_churn);
     let churn = hotspots::churn_totals(changes);
     let soc_scores = soc::scores_by_entity(changes, opts);
-    let frag_scores = effort::fragmentation_by_entity(changes);
+    let frag_scores = effort::fragmentation_by_entity(changes, opts.temporal_period);
     let maxima = maxima_for(&entities, &revs, &churn, &soc_scores, &frag_scores);
     let mut rows = score_rows(
         &entities,
@@ -265,5 +266,51 @@ mod tests {
         assert!((norm_u64(3, 6) - 0.5).abs() < f64::EPSILON);
         assert!((norm_f64(1.0, 0.0) - 0.0).abs() < f64::EPSILON);
         assert!((norm_f64(1.0, 2.0) - 0.5).abs() < f64::EPSILON);
+    }
+
+    fn day_opts(min_revs: u64) -> Options {
+        Options {
+            min_revs,
+            temporal_period: crate::options::TemporalPeriod::Day,
+            ..Options::default()
+        }
+    }
+
+    #[test]
+    fn day_period_min_revs_uses_logical_revisions() {
+        let changes = crate::analysis::fixtures::same_day_pair_changes();
+        assert!(run(&changes, &day_opts(2)).rows.is_empty());
+        assert!(!run(&changes, &day_opts(1)).rows.is_empty());
+    }
+
+    #[test]
+    fn day_period_revs_column_shows_logical_count() {
+        let changes = crate::analysis::fixtures::same_day_pair_changes();
+        let table = run(&changes, &day_opts(1));
+        let a = table.rows.iter().find(|r| r[0] == "a.rs");
+        assert_eq!(a.map(|r| r[2].as_str()), Some("1"));
+        assert_eq!(a.map(|r| r[4].as_str()), Some("1"));
+    }
+
+    #[test]
+    fn day_period_fragmentation_uses_logical_revisions() {
+        let changes = vec![
+            Change::new("1", "Ada", "2024-01-01", "a.rs", Some(1), Some(0)),
+            Change::new("2", "Ada", "2024-01-01", "a.rs", Some(1), Some(0)),
+            Change::new("3", "Bea", "2024-01-01", "a.rs", Some(1), Some(0)),
+        ];
+        let raw = run(
+            &changes,
+            &Options {
+                min_revs: 1,
+                ..Options::default()
+            },
+        );
+        let day = run(&changes, &day_opts(1));
+        let raw_frag = &raw.rows[0][5];
+        let day_frag = &day.rows[0][5];
+        assert_ne!(raw_frag, day_frag);
+        assert_eq!(day.rows[0][2], "2");
+        assert_eq!(day_frag, "50.00");
     }
 }

@@ -202,7 +202,7 @@ missing.
 | `-x`, `--max-coupling N` | Max coupling degree percent | `100` |
 | `-s`, `--max-changeset-size N` | Max changeset size for coupling | `30` (max `200`) |
 | `-d`, `--age-time-now YYYY-MM-DD` | Reference date for `age` | unset |
-| `-t`, `--temporal-period day` | Merge same-day commits per author for coupling-style metrics | off |
+| `-t`, `--temporal-period day` | Merge same-day commits per author for coupling, SOC, and risk’s revision-based inputs (revs, SOC, fragmentation); churn stays total lines | off |
 | `-g`, `--group FILE` | Layer map (`prefix => layer` lines) | unset |
 | `--exclude PREFIX` | Drop matching paths (repeatable) | none |
 | `--include PREFIX` | Keep only matching paths (repeatable) | none |

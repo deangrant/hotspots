@@ -6,8 +6,9 @@ use crate::analysis::table::Table;
 use crate::analysis::util::{
     cmp_f64_desc, count_as_u64, fmt_pct, fmt_u64, meets_min_revs, percent,
 };
+use crate::index::logical_rev;
 use crate::model::Change;
-use crate::options::Options;
+use crate::options::{Options, TemporalPeriod};
 
 type EntityAuthorRevs = BTreeMap<String, BTreeMap<String, BTreeSet<String>>>;
 
@@ -111,15 +112,30 @@ fn fragmentation_score(authors: &BTreeMap<String, BTreeSet<String>>, total: u64)
     (1.0 - sum_sq) * 100.0
 }
 
-/// Fragmentation score per entity (unfiltered).
-pub fn fragmentation_by_entity(changes: &[Change]) -> BTreeMap<String, f64> {
-    let map = collect_revs(changes);
+/// Fragmentation score per entity (unfiltered), keyed by logical revisions.
+pub fn fragmentation_by_entity(
+    changes: &[Change],
+    period: TemporalPeriod,
+) -> BTreeMap<String, f64> {
+    let map = collect_logical_revs(changes, period);
     map.into_iter()
         .map(|(entity, authors)| {
             let total = total_revs(&authors);
             (entity, fragmentation_score(&authors, total))
         })
         .collect()
+}
+
+fn collect_logical_revs(changes: &[Change], period: TemporalPeriod) -> EntityAuthorRevs {
+    let mut map: EntityAuthorRevs = BTreeMap::new();
+    for change in changes {
+        map.entry(change.entity.clone())
+            .or_default()
+            .entry(change.author.clone())
+            .or_default()
+            .insert(logical_rev(change, period));
+    }
+    map
 }
 
 fn leading_author_by_revs(authors: BTreeMap<String, BTreeSet<String>>) -> Option<(String, u64)> {

@@ -24,7 +24,7 @@ Options:
   -x, --max-coupling N           Max coupling degree percent (default: 100)
   -s, --max-changeset-size N     Max changeset size for coupling (default: 30, max: 200)
   -d, --age-time-now YYYY-MM-DD  Reference date for age analysis
-  -t, --temporal-period day      Merge same-day commits per author
+  -t, --temporal-period day      Merge same-day commits per author (coupling, SOC, risk)
   -g, --group FILE               Layer map (`prefix => layer` lines)
       --exclude PREFIX           Drop matching paths (repeatable)
       --include PREFIX           Keep only matching paths (repeatable)

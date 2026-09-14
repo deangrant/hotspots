@@ -62,7 +62,8 @@ impl ChangesetIndex {
     }
 }
 
-fn logical_rev(change: &Change, period: TemporalPeriod) -> String {
+/// Logical revision key for a change under the given temporal strategy.
+pub(crate) fn logical_rev(change: &Change, period: TemporalPeriod) -> String {
     match period {
         TemporalPeriod::None => change.rev.clone(),
         TemporalPeriod::Day => format!("day:{}:{}", change.date, change.author),
