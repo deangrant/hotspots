@@ -17,7 +17,7 @@ full analysis pipeline, see [ARCHITECTURE.md](.agents/docs/ARCHITECTURE.md).
 - A Rust toolchain that matches [`rust-toolchain.toml`](rust-toolchain.toml)
   (currently **1.94.0**) and `cargo`
 - `git` on your `PATH` when you use `--grain function` (or set `GIT_EXECUTABLE`
-  to another binary)
+  to another binary — same trust as `PATH`, not a sandboxed allowlist)
 - A shell and a Git repository when you export a log or run function grain
 
 ## Build and run
@@ -151,7 +151,8 @@ are also dropped with a stderr count.
 Failures (missing `--repo`, git errors, unparsable `.rs`, or a blob/patch over
 the 16 MiB git stdout cap) **abort** the run. There is no silent fallback to
 file grain. Restrict mixed-language logs with `--include`. The `git` binary
-comes from `PATH`, or from `GIT_EXECUTABLE` when set.
+comes from `PATH`, or from `GIT_EXECUTABLE` when set (operator override under
+the same trust as `PATH`).
 
 ```bash
 hotspots -l logfile.log -c git2 --grain function --repo . -n 1 -r 20

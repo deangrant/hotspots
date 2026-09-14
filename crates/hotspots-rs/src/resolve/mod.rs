@@ -25,7 +25,7 @@ pub struct RustGitSynResolver<G = SystemGit> {
 }
 
 impl RustGitSynResolver<SystemGit> {
-    /// Builds a resolver that shells out to `git`.
+    /// Builds a resolver that invokes `git` via argv (no shell).
     #[must_use]
     pub const fn new() -> Self {
         Self { git: SystemGit }

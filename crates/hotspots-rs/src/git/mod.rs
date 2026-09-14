@@ -1,7 +1,9 @@
 //! Git command helpers.
 //!
 //! [`SystemGit`] resolves the binary from `GIT_EXECUTABLE` when set, otherwise
-//! the `git` name on `PATH` (normal for local developer CLIs).
+//! the `git` name on `PATH`. The env override is the same trust as placing a
+//! binary on `PATH` (operator-controlled local CLI); it is not a sandboxed
+//! allowlist.
 
 #[cfg(test)]
 use std::cell::Cell;

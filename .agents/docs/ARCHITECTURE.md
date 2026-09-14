@@ -192,8 +192,8 @@ Pipeline entry:
 ## `hotspots-rs` module map
 
 [`RustGitSynResolver`](../../crates/hotspots-rs/src/resolve/mod.rs) implements
-`SymbolResolver`. The resolver shells out to `git` (up to 8 concurrent jobs per
-expand), parses blobs with `syn`, and feeds
+`SymbolResolver`. The resolver invokes `git` via argv with no shell (up to 8
+concurrent jobs per expand), parses blobs with `syn`, and feeds
 [`expand_with_diffs`](../../crates/hotspots/src/symbols/expand.rs).
 
 | Area | Path | Role |

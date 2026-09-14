@@ -8,7 +8,12 @@ fn rejects_unsafe_rev_and_path() {
     assert!(validate_rev_path("a:b", "a.rs").is_err());
     assert!(validate_rev_path("abc", "a:b.rs").is_err());
     assert!(validate_rev_path("abc\0", "a.rs").is_err());
+}
+
+#[test]
+fn accepts_safe_rev_and_path() {
     assert!(validate_rev_path("abc123", "src/a.rs").is_ok());
+    assert!(validate_rev_path("abc", "src/my file.rs").is_ok());
 }
 
 #[test]
