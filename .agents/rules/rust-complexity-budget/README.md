@@ -1,6 +1,6 @@
 # Rust complexity budget (Rule)
 
-Globs on `**/*.rs`. Encodes clippy / file-size / CC dogfood limits.
+Globs on `**/*.rs`. Encodes clippy / file-size / CC≤8 (CRAP strict) dogfood limits.
 
 ## Files
 

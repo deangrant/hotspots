@@ -11,5 +11,6 @@ alwaysApply: false
 - Keep `.rs` files at or under **500** physical lines.
 - Prefer extracting helpers over `#[allow(...)]`. Suppressions must be
   `#[expect(..., reason = "...")]`.
-- Dogfood CRAP complexity stays manageable (**CC ≤ 5** at full line coverage);
-  do not re-merge intentional CC≤5 splits solely for DRY.
+- Dogfood CRAP complexity stays at or under **CC ≤ 8** at full line coverage
+  (same bar as `--threshold strict`); do not re-merge intentional CC≤8 splits
+  solely for DRY.

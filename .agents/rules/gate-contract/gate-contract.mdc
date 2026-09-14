@@ -1,0 +1,22 @@
+---
+description: Enforce /verify gates after Rust edits; never relax thresholds or pins
+globs: "**/*"
+alwaysApply: true
+---
+
+# Gate contract
+
+- After non-trivial Rust edits, run narrow checks first, then `/verify` (or the
+  ordered gates in [verify-gates](../../skills/verify-gates/SKILL.md)) before
+  claiming the change is merge-ready.
+- Prefer [`.agents/hooks/run-verify.sh`](../../hooks/run-verify.sh) or the skill
+  command list over pasted ad-hoc gate recipes.
+- Never relax or bypass solely to hide failures:
+  - [`clippy.toml`](../../../clippy.toml) thresholds
+  - llvm-cov `--fail-under-lines 100`
+  - dry-rs `--fail-on-findings` ([`scripts/dry-gate.sh`](../../../scripts/dry-gate.sh))
+  - CRAP `--threshold strict` (8) ([`scripts/crap-gate.sh`](../../../scripts/crap-gate.sh))
+  - tool pins in [`scripts/dry-score.rev`](../../../scripts/dry-score.rev) /
+    [`scripts/crap-score.rev`](../../../scripts/crap-score.rev)
+- Do not claim `/verify` or CI passed unless those commands were actually run
+  and succeeded.

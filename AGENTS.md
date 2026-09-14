@@ -58,11 +58,13 @@ More specific guidance takes precedence over general guidance.
 Rules define repository constraints and invariants. Skills provide task-specific
 implementation guidance. Documentation provides architectural and product context.
 
-There is no always-on gate-contract rule. [rust-complexity-budget](.agents/rules/rust-complexity-budget/)
-is glob-scoped to `**/*.rs`. [hotspots-domain](.agents/rules/hotspots-domain/) is glob-scoped
-to product crates. [ai-slop-mitigation](.agents/rules/ai-slop-mitigation/) is opt-in.
-This file tells you **when to load** skills and docs; rules state **what you must not do**.
-If a skill suggests something a rule forbids, the rule wins.
+[`gate-contract`](.agents/rules/gate-contract/) is `alwaysApply: true` and reminds
+agents to run `/verify` and not relax quality gates. [rust-complexity-budget](.agents/rules/rust-complexity-budget/)
+is glob-scoped to `**/*.rs`. [hotspots-domain](.agents/rules/hotspots-domain/) is
+glob-scoped to product crates. [ai-slop-mitigation](.agents/rules/ai-slop-mitigation/)
+is opt-in. This file tells you **when to load** skills and docs; rules state
+**what you must not do**. If a skill suggests something a rule forbids, the rule
+wins.
 
 ## Operating Principles
 
@@ -83,7 +85,7 @@ If a skill suggests something a rule forbids, the rule wins.
 - Silent fallback from function grain to file grain when `--repo`, git, or `syn` fails.
 - Putting `git` or `syn` into `hotspots` instead of `hotspots-rs` behind `SymbolResolver`.
 - HEAD-only symbol maps instead of per-commit tables plus zero-context (`-U0`) hunk overlap.
-- Re-merging CC≤5 dispatch splits that were extracted for Clippy, then fighting complexity budgets.
+- Re-merging CC≤8 dispatch splits that were extracted for Clippy, then fighting complexity budgets.
 - Relaxing Clippy thresholds, the llvm-cov 100% line gate, the dry-rs
   `--fail-on-findings` gate, or the CRAP `--threshold strict` gate solely to hide
   failures.
@@ -126,18 +128,22 @@ Cross-crate or pipeline changes: read
 
 - [README.md](README.md) — product overview, log export, grain, examples, CI notes
 - [`.agents/docs/ARCHITECTURE.md`](.agents/docs/ARCHITECTURE.md) — crate roles, analysis pipeline, module maps, and invariants
-- [DeepWiki](https://deepwiki.com/deangrant/hotpsots) — indexed project wiki for additional architecture, API, and pipeline context
+- [DeepWiki](https://deepwiki.com/deangrant/hotspots) — indexed project wiki for additional architecture, API, and pipeline context
 - [`Cargo.toml`](Cargo.toml) — virtual workspace members and maximum `[workspace.lints]`
 - [`clippy.toml`](clippy.toml) — cognitive 8, type 200, function 50 lines
 - [`rustfmt.toml`](rustfmt.toml) — `max_width` 100
 - [`deny.toml`](deny.toml) — cargo-deny policy (`multiple-versions` deny)
 - [`rust-toolchain.toml`](rust-toolchain.toml) — pinned toolchain and components
-- [`.github/workflows/`](.github/workflows/) — lint, test, coverage, supply-chain
+- [`.github/workflows/`](.github/workflows/) — lint, test, coverage, dry, supply-chain
 
 ## Rules
 
 Canonical repository rules live under [`.agents/rules/`](.agents/rules/). The directory
 is loaded from [`.cursor/rules`](.cursor/rules).
+
+### Always-on
+
+- [`.agents/rules/gate-contract/`](.agents/rules/gate-contract/) — run `/verify`; never relax gates or pins
 
 ### Glob-scoped
 

@@ -280,7 +280,7 @@ Agent support lives under `.agents/`:
 - `docs/` — this architecture file
 - `skills/` — verify-gates, hotspots-domain, Rust style, SOLID
 - `commands/` — `/verify`, `/design-scan`
-- `rules/` — complexity budget, hotspots-domain, AI slop mitigation (opt-in)
+- `rules/` — gate-contract (always-on); complexity budget; hotspots-domain; AI slop (opt-in)
 - `hooks/` — rustfmt after edit; session context; verify on stop
 
 See [AGENTS.md](../../AGENTS.md) for the full index.
