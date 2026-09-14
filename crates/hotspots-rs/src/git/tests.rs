@@ -13,10 +13,17 @@ fn rejects_unsafe_rev_and_path() {
 
 #[test]
 fn missing_path_uses_error_flag() {
-    let err = git_command_failed(&["show", "r:p"], "path 'p' does not exist in 'r'");
-    assert!(is_missing_path_error(&err));
-    let other = git_command_failed(&["show"], "fatal: bad object");
+    let missing = git_command_failed(&["show", "r:p"], "path 'p' does not exist in 'r'");
+    assert!(is_missing_path_error(&missing));
+    let on_disk = git_command_failed(
+        &["show", "r:p"],
+        "fatal: path 'p' exists on disk, but not in 'r'",
+    );
+    assert!(is_missing_path_error(&on_disk));
+    let other = git_command_failed(&["show", "r:p"], "fatal: bad object");
     assert!(!is_missing_path_error(&other));
+    let unrelated = git_command_failed(&["diff-tree", "a", "b"], "path 'p' does not exist in 'a'");
+    assert!(!is_missing_path_error(&unrelated));
 }
 
 #[test]

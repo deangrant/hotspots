@@ -88,6 +88,8 @@ fn spawn_git(repo: &Path, args: &[&str]) -> Result<Child> {
         .arg("-C")
         .arg(repo)
         .args(args)
+        .env("LC_ALL", "C")
+        .env_remove("LANGUAGE")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -210,11 +212,25 @@ fn decode_git_bytes(bytes: Vec<u8>, stream: &str) -> Result<String> {
 
 fn git_command_failed(args: &[&str], stderr: &str) -> Error {
     let message = format!("git {} failed: {stderr}", args.join(" "));
-    if stderr.to_ascii_lowercase().contains("does not exist") {
+    if is_show_blob_missing_path(args, stderr) {
         Error::git_missing_path(message)
     } else {
         Error::git(message)
     }
+}
+
+/// Returns whether stderr is a known English path-absent message for `show REV:PATH`.
+#[must_use]
+pub fn is_path_absent_stderr(stderr: &str) -> bool {
+    let lower = stderr.to_ascii_lowercase();
+    lower.contains("does not exist in") || lower.contains("exists on disk, but not in")
+}
+
+fn is_show_blob_missing_path(args: &[&str], stderr: &str) -> bool {
+    args.first() == Some(&"show")
+        && args.len() == 2
+        && args[1].contains(':')
+        && is_path_absent_stderr(stderr)
 }
 
 fn wait_with_timeout(child: &mut Child, args: &[&str]) -> Result<ExitStatus> {

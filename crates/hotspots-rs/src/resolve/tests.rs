@@ -20,7 +20,7 @@ impl GitRunner for MapGit {
             return Ok(out.clone());
         }
         if let Some(msg) = self.err.get(&key) {
-            if msg.to_ascii_lowercase().contains("does not exist") {
+            if crate::git::is_path_absent_stderr(msg) {
                 return Err(Error::git_missing_path(msg.clone()));
             }
             return Err(Error::git(msg.clone()));

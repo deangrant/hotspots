@@ -26,7 +26,7 @@ pub fn run(changes: &[Change], opts: &Options) -> Table {
     );
     push_stat(
         &mut table,
-        "number-of-entities-changed",
+        "number-of-change-rows",
         count_as_u64(changes.len()),
     );
     push_stat(&mut table, "number-of-authors", count_as_u64(authors.len()));
@@ -35,4 +35,29 @@ pub fn run(changes: &[Change], opts: &Options) -> Table {
 
 fn push_stat(table: &mut Table, name: &str, value: u64) {
     table.push_row([String::from(name), fmt_u64(value)]);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::options::Options;
+
+    #[test]
+    fn reports_change_rows_statistic() {
+        let changes = [
+            Change::new("1", "Ada", "2024-01-01", "a.rs", Some(1), Some(0)),
+            Change::new("2", "Ada", "2024-01-02", "a.rs", Some(1), Some(0)),
+            Change::new("2", "Bea", "2024-01-02", "b.rs", Some(1), Some(0)),
+        ];
+        let table = run(&changes, &Options::default());
+        assert_eq!(
+            table.rows,
+            vec![
+                vec![String::from("number-of-commits"), String::from("2")],
+                vec![String::from("number-of-entities"), String::from("2")],
+                vec![String::from("number-of-change-rows"), String::from("3")],
+                vec![String::from("number-of-authors"), String::from("2")],
+            ]
+        );
+    }
 }

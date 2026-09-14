@@ -132,6 +132,7 @@ fn rejects_unknown_analysis_and_coupling_bounds() {
 #[test]
 fn rejects_invalid_age_time_now() {
     assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-d", "not-a-date"])).is_err());
+    assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-d", "2024-13-40"])).is_err());
     assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "-d", "2024-01-02"])).is_ok());
 }
 

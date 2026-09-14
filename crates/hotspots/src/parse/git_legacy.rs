@@ -61,6 +61,7 @@ fn finish_header(
     if author.is_empty() {
         return Err(Error::msg(format!("legacy header missing author: {line}")));
     }
+    crate::date::parse_date(date)?;
     Ok(Some((rev.to_owned(), author.to_owned(), date.to_owned())))
 }
 
@@ -151,6 +152,7 @@ mod tests {
         assert!(GitLegacyParser.parse(&mut Cursor::new("[abc] subject without date")).is_err());
         assert!(GitLegacyParser.parse(&mut Cursor::new("[abc]Ada2024-01-01 no-space")).is_err());
         assert!(GitLegacyParser.parse(&mut Cursor::new("[abc] short")).is_err());
+        assert!(GitLegacyParser.parse(&mut Cursor::new("[abc] Ada 2024-13-40 subject")).is_err());
     }
 
     #[test]

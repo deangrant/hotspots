@@ -142,6 +142,29 @@ fn expands_deleted_function_via_parent_blob() {
 }
 
 #[test]
+fn expands_deleted_function_when_path_exists_on_disk() {
+    let repo = TempRepo::create("delete-ondisk");
+    write_file(&repo.path, "a.rs", "fn alpha() {}\n");
+    stage_all(&repo.path);
+    assert!(!git_commit(&repo.path, "add", "2024-01-01").is_empty());
+    assert!(fs::remove_file(repo.path.join("a.rs")).is_ok());
+    stage_all(&repo.path);
+    let rev = git_commit(&repo.path, "delete", "2024-01-02");
+    assert!(!rev.is_empty());
+    write_file(&repo.path, "a.rs", "fn later() {}\n");
+    let changes = [Change::new(
+        &rev,
+        "Ada",
+        "2024-01-02",
+        "a.rs",
+        Some(0),
+        Some(1),
+    )];
+    let rows = expand(&repo.path, &changes);
+    assert!(rows.iter().any(|c| c.entity == "a.rs::alpha" && c.deleted == Some(1)));
+}
+
+#[test]
 fn expands_rename_away_old_path_and_new_path() {
     let repo = TempRepo::create("rename");
     write_file(&repo.path, "old.rs", "fn alpha() {}\n");
