@@ -2,6 +2,9 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 
 use hotspots::symbols::{ExpandStats, FileDiff, SymbolResolver, expand_with_diffs, is_rust_path};
 use hotspots::{Change, Error, Result};
@@ -11,6 +14,9 @@ use crate::git::{
     GitRunner, SystemGit, ensure_work_tree, is_missing_path_error, show_blob, show_hunks,
 };
 use crate::parse::symbols_from_source;
+
+/// Upper bound on concurrent git workers for function-grain expansion.
+const MAX_GIT_JOBS: usize = 8;
 
 /// Resolves Rust file changes to `path::symbol` entities via git + syn.
 #[derive(Debug, Clone, Copy, Default)]
@@ -37,13 +43,7 @@ impl<G: GitRunner> RustGitSynResolver<G> {
 impl<G: GitRunner> SymbolResolver for RustGitSynResolver<G> {
     fn expand(&self, changes: &[Change], repo: &Path) -> Result<(Vec<Change>, ExpandStats)> {
         ensure_work_tree(&self.git, repo)?;
-        let keys = rust_keys(changes);
-        let mut cache = SymbolCache::new(&self.git, repo);
-        let mut diffs = BTreeMap::new();
-        for (rev, path) in keys {
-            let diff = build_file_diff(&mut cache, &rev, &path)?;
-            diffs.insert((rev, path), diff);
-        }
+        let diffs = expand_keys_parallel(&self.git, repo, rust_keys(changes))?;
         expand_with_diffs(changes, &diffs)
     }
 }
@@ -54,6 +54,83 @@ fn rust_keys(changes: &[Change]) -> BTreeSet<(String, String)> {
         .filter(|c| is_rust_path(&c.entity))
         .map(|c| (c.rev.clone(), c.entity.clone()))
         .collect()
+}
+
+fn git_job_count(key_count: usize) -> usize {
+    if key_count == 0 {
+        return 1;
+    }
+    thread::available_parallelism()
+        .map(std::num::NonZero::get)
+        .unwrap_or(1)
+        .min(MAX_GIT_JOBS)
+        .min(key_count)
+        .max(1)
+}
+
+fn expand_keys_parallel(
+    git: &dyn GitRunner,
+    repo: &Path,
+    keys: BTreeSet<(String, String)>,
+) -> Result<BTreeMap<(String, String), FileDiff>> {
+    let keys: Vec<(String, String)> = keys.into_iter().collect();
+    if keys.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let slots = Mutex::new((0..keys.len()).map(|_| None).collect::<Vec<_>>());
+    let next = AtomicUsize::new(0);
+    let jobs = git_job_count(keys.len());
+    // One job stays on the caller thread so test overrides (thread-local limits) apply.
+    if jobs == 1 {
+        fill_diff_slots(git, repo, &keys, &next, &slots);
+    } else {
+        thread::scope(|scope| {
+            for _ in 0..jobs {
+                scope.spawn(|| {
+                    fill_diff_slots(git, repo, &keys, &next, &slots);
+                });
+            }
+        });
+    }
+    collect_ordered_diffs(
+        keys,
+        slots.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner),
+    )
+}
+
+fn fill_diff_slots(
+    git: &dyn GitRunner,
+    repo: &Path,
+    keys: &[(String, String)],
+    next: &AtomicUsize,
+    slots: &Mutex<Vec<Option<Result<FileDiff>>>>,
+) {
+    loop {
+        let index = next.fetch_add(1, Ordering::Relaxed);
+        if index >= keys.len() {
+            return;
+        }
+        let (rev, path) = &keys[index];
+        let mut cache = SymbolCache::new(git, repo);
+        let built = build_file_diff(&mut cache, rev, path);
+        if let Ok(mut guard) = slots.lock()
+            && let Some(slot) = guard.get_mut(index)
+        {
+            *slot = Some(built);
+        }
+    }
+}
+
+fn collect_ordered_diffs(
+    keys: Vec<(String, String)>,
+    slots: Vec<Option<Result<FileDiff>>>,
+) -> Result<BTreeMap<(String, String), FileDiff>> {
+    let mut diffs = BTreeMap::new();
+    for (key, slot) in keys.into_iter().zip(slots) {
+        let diff = slot.ok_or_else(|| Error::msg("internal: missing parallel diff slot"))?;
+        diffs.insert(key, diff?);
+    }
+    Ok(diffs)
 }
 
 struct CachedBlobErr {

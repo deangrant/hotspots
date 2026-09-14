@@ -43,9 +43,9 @@ fn read_capped_enforces_byte_limit() {
             .is_err_and(|e| e.to_string().contains("git stderr exceeds"))
     );
     assert!(ensure_stdout_byte_limit("ok").is_ok());
-    TEST_STDOUT_LIMIT.store(4, std::sync::atomic::Ordering::Relaxed);
+    TEST_STDOUT_LIMIT.with(|cell| cell.set(4));
     let over = ensure_stdout_byte_limit("12345");
-    TEST_STDOUT_LIMIT.store(0, std::sync::atomic::Ordering::Relaxed);
+    TEST_STDOUT_LIMIT.with(|cell| cell.set(0));
     assert!(over.is_err_and(|e| e.to_string().contains("git stdout exceeds")));
 }
 

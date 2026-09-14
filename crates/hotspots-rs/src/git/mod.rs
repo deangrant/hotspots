@@ -3,6 +3,8 @@
 //! [`SystemGit`] resolves the binary from `GIT_EXECUTABLE` when set, otherwise
 //! the `git` name on `PATH` (normal for local developer CLIs).
 
+#[cfg(test)]
+use std::cell::Cell;
 use std::ffi::OsString;
 use std::io::Read;
 use std::path::Path;
@@ -27,10 +29,12 @@ const MAX_GIT_STDERR_BYTES: usize = 1024 * 1024;
 static TEST_GIT_EXECUTABLE: Mutex<Option<OsString>> = Mutex::new(None);
 
 #[cfg(test)]
-static TEST_STDOUT_LIMIT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+thread_local! {
+    static TEST_STDOUT_LIMIT: Cell<usize> = const { Cell::new(0) };
+}
 
 /// Runs git commands in a repository.
-pub trait GitRunner {
+pub trait GitRunner: Send + Sync {
     /// Runs `git -C repo …` and returns stdout on success.
     ///
     /// # Errors
@@ -151,7 +155,7 @@ fn map_reader_io_err(stream: &str, err: &std::io::Error) -> Error {
 
 #[cfg(test)]
 fn stdout_byte_limit() -> usize {
-    let override_limit = TEST_STDOUT_LIMIT.load(std::sync::atomic::Ordering::Relaxed);
+    let override_limit = TEST_STDOUT_LIMIT.with(Cell::get);
     if override_limit > 0 {
         return override_limit;
     }
@@ -165,7 +169,7 @@ const fn stdout_byte_limit() -> usize {
 
 #[cfg(test)]
 pub fn set_test_stdout_limit(limit: usize) {
-    TEST_STDOUT_LIMIT.store(limit, std::sync::atomic::Ordering::Relaxed);
+    TEST_STDOUT_LIMIT.with(|cell| cell.set(limit));
 }
 
 /// Rejects git stdout payloads larger than the configured byte cap.

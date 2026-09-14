@@ -190,14 +190,15 @@ Pipeline entry:
 
 ## `hotspots-rs` module map
 
-[`RustGitSynResolver`](../../crates/hotspots-rs/src/resolve.rs) implements
-`SymbolResolver`. The resolver shells out to `git`, parses blobs with `syn`, and
-feeds [`expand_with_diffs`](../../crates/hotspots/src/symbols/expand.rs).
+[`RustGitSynResolver`](../../crates/hotspots-rs/src/resolve/mod.rs) implements
+`SymbolResolver`. The resolver shells out to `git` (up to 8 concurrent jobs per
+expand), parses blobs with `syn`, and feeds
+[`expand_with_diffs`](../../crates/hotspots/src/symbols/expand.rs).
 
 | Area | Path | Role |
 | ---- | ---- | ---- |
-| Resolve | [`resolve.rs`](../../crates/hotspots-rs/src/resolve.rs) | `RustGitSynResolver` / `SymbolResolver` |
-| Git | [`git.rs`](../../crates/hotspots-rs/src/git.rs) | `GitRunner`, work-tree checks, blob and hunk fetch |
+| Resolve | [`resolve/`](../../crates/hotspots-rs/src/resolve/mod.rs) | `RustGitSynResolver` / `SymbolResolver` |
+| Git | [`git/`](../../crates/hotspots-rs/src/git/mod.rs) | `GitRunner`, work-tree checks, blob and hunk fetch |
 | Diff | [`diff.rs`](../../crates/hotspots-rs/src/diff.rs) | Unified-diff hunk header parsing |
 | Parse | [`parse.rs`](../../crates/hotspots-rs/src/parse.rs) | `syn` → `SymbolFact` ranges |
 
@@ -234,6 +235,7 @@ flowchart TB
 | Change streams cap at `MAX_CHANGE_ROWS` (1_000_000) | Bounds memory for large exports |
 | Git stdout/stderr byte caps (16 MiB / 1 MiB) | Prevents OOM from huge blobs or patches |
 | Function-grain cache stores symbols, not source text | Drops blob bodies after `syn` parse |
+| Function grain fans out up to 8 concurrent git jobs | Keeps long histories usable without changing attribution |
 | No `#[allow]`; use `#[expect(..., reason = "...")]` | Matches workspace lints; see [rust-style-guide](../skills/rust-style-guide/SKILL.md) |
 | Workspace members are `hotspots`, `hotspots-cli`, and `hotspots-rs` | Update this document if you add or rename crates |
 

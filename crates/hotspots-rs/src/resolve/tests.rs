@@ -1,8 +1,8 @@
 use super::*;
 
-use std::cell::Cell;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use hotspots::Change;
 use hotspots::symbols::SymbolResolver;
@@ -31,13 +31,13 @@ impl GitRunner for MapGit {
 
 struct CountingGit {
     inner: MapGit,
-    shows: Cell<usize>,
+    shows: AtomicUsize,
 }
 
 impl GitRunner for CountingGit {
     fn run(&self, repo: &Path, args: &[&str]) -> Result<String> {
         if args.first() == Some(&"show") && args.len() == 2 && args[1].contains(':') {
-            self.shows.set(self.shows.get() + 1);
+            self.shows.fetch_add(1, Ordering::Relaxed);
         }
         self.inner.run(repo, args)
     }
@@ -184,7 +184,7 @@ fn cached_blob_error_helpers() {
 }
 
 #[test]
-fn blob_cache_reuses_shared_rev_path() {
+fn expand_fetches_blobs_per_key() {
     let src = "fn alpha() {}\n";
     let patch = "@@ -0,0 +1,1 @@\n+fn alpha() {}\n";
     let mut ok = work_tree_ok();
@@ -211,7 +211,7 @@ fn blob_cache_reuses_shared_rev_path() {
     ]);
     let git = CountingGit {
         inner: MapGit { ok, err },
-        shows: Cell::new(0),
+        shows: AtomicUsize::new(0),
     };
     let resolver = RustGitSynResolver::with_git(git);
     let changes = [
@@ -219,7 +219,8 @@ fn blob_cache_reuses_shared_rev_path() {
         Change::new("base^", "Ada", "2024-01-02", "a.rs", Some(1), Some(0)),
     ];
     assert!(resolver.expand(&changes, Path::new("/repo")).is_ok());
-    assert_eq!(resolver.git.shows.get(), 3);
+    // Local per-key caches: each key loads new + parent (base^ shared across keys is not cached).
+    assert_eq!(resolver.git.shows.load(Ordering::Relaxed), 4);
 }
 
 #[test]
@@ -296,4 +297,93 @@ fn hunk_load_and_syn_parse_errors() {
             .expand(&[change("syn", Some(1), Some(0))], Path::new("/repo"))
             .is_err_and(|e| e.to_string().contains("cannot load hunks"))
     );
+}
+
+#[test]
+fn parallel_expand_covers_multiple_keys() {
+    let src = "fn alpha() {}\n";
+    let patch = "@@ -0,0 +1,1 @@\n+fn alpha() {}\n";
+    let mut ok = work_tree_ok();
+    for rev in ["aaa", "bbb"] {
+        ok.insert(format!("show {rev}:a.rs"), String::from(src));
+        ok.insert(format!("show {rev}^:a.rs"), String::from(src));
+        ok.insert(
+            format!("show -U0 --format= {rev} -- a.rs"),
+            String::from(patch),
+        );
+    }
+    let err = HashMap::from([
+        (
+            String::from("diff-tree -U0 aaa^ aaa -- a.rs"),
+            String::from("no parent"),
+        ),
+        (
+            String::from("diff-tree -U0 bbb^ bbb -- a.rs"),
+            String::from("no parent"),
+        ),
+    ]);
+    let resolver = RustGitSynResolver::with_git(MapGit { ok, err });
+    let changes = [
+        Change::new("aaa", "Ada", "2024-01-01", "a.rs", Some(1), Some(0)),
+        Change::new("bbb", "Ada", "2024-01-02", "a.rs", Some(1), Some(0)),
+    ];
+    let expanded = resolver.expand(&changes, Path::new("/repo"));
+    assert!(
+        expanded.is_ok_and(|(rows, _)| {
+            rows.iter().filter(|c| c.entity == "a.rs::alpha").count() == 2
+        })
+    );
+}
+
+#[test]
+fn git_job_count_and_collect_helpers() {
+    assert_eq!(git_job_count(0), 1);
+    assert!(git_job_count(1) >= 1);
+    assert!(git_job_count(100) <= MAX_GIT_JOBS);
+    let err = collect_ordered_diffs(vec![(String::from("r"), String::from("a.rs"))], vec![None]);
+    assert!(err.is_err_and(|e| e.to_string().contains("missing parallel diff slot")));
+    let empty = expand_keys_parallel(&MapGit::default(), Path::new("/repo"), BTreeSet::new());
+    assert!(empty.is_ok_and(|diffs| diffs.is_empty()));
+}
+
+#[test]
+fn expand_non_rust_only_uses_empty_key_set() {
+    let resolver = RustGitSynResolver::with_git(MapGit {
+        ok: work_tree_ok(),
+        err: HashMap::new(),
+    });
+    let changes = [Change::new(
+        "abc",
+        "Ada",
+        "2024-01-01",
+        "readme.md",
+        Some(1),
+        Some(0),
+    )];
+    assert!(
+        resolver
+            .expand(&changes, Path::new("/repo"))
+            .is_ok_and(|(rows, stats)| rows.is_empty() && stats.dropped_non_rust == 1)
+    );
+}
+
+#[test]
+fn symbol_cache_replays_hit_without_refetch() {
+    let mut ok = work_tree_ok();
+    ok.insert(
+        String::from("show abc:a.rs"),
+        String::from("fn alpha() {}\n"),
+    );
+    let git = CountingGit {
+        inner: MapGit {
+            ok,
+            err: HashMap::new(),
+        },
+        shows: AtomicUsize::new(0),
+    };
+    let mut cache = SymbolCache::new(&git, Path::new("/repo"));
+    assert!(cache.symbols_for("abc", "a.rs").is_ok());
+    assert_eq!(git.shows.load(Ordering::Relaxed), 1);
+    assert!(cache.symbols_for("abc", "a.rs").is_ok());
+    assert_eq!(git.shows.load(Ordering::Relaxed), 1);
 }

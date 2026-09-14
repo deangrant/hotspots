@@ -130,8 +130,10 @@ resolver that calls `git` against `--repo`.
 Function grain requires a Git work tree via `--repo`. Revisions in the log must
 exist in that repository. Attribution uses **per-commit** symbol tables
 (`git show REV:PATH`) and **zero-context** hunk overlap (`git show` /
-`diff-tree -U0`). It does **not** apply a HEAD-only symbol map to numstat
-totals.
+`diff-tree -U0`). Unique `(rev, path)` keys are fetched with up to **8**
+concurrent git workers. Long histories should still narrow the log with
+`--after` / `--include`. It does **not** apply a HEAD-only symbol map to
+numstat totals.
 
 Deleted or renamed-away paths load symbols from the parent blob (`REV^:PATH`).
 If the path is missing on both sides, the run **fails closed**. Non-Rust paths
