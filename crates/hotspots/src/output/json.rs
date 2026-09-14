@@ -7,6 +7,9 @@ use crate::error::Result;
 
 /// Writes a table as a JSON array of flat objects.
 ///
+/// Every field value is a JSON string (the same cell text as the text table),
+/// including numeric metrics.
+///
 /// # Errors
 ///
 /// Returns an error when writing to `out` fails.

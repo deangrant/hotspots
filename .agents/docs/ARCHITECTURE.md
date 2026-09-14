@@ -153,8 +153,9 @@ flowchart TD
 Function grain stays **fail-closed**. Missing `--repo`, missing resolver, git
 errors, and unparsable `.rs` abort the run. There is no silent fallback to file
 grain. Non-Rust paths, paths with no line hunks, and hunks that miss all
-`fn`/`impl` symbols are dropped and counted in `ExpandStats` (stderr notes from
-the CLI).
+attributed symbols are dropped and counted in `ExpandStats` (stderr notes from
+the CLI). Attribution covers free `fn`, `impl` methods, and trait methods
+(including nested modules)—not macros, `const`, types, statics, or other items.
 
 Attribution uses **per-commit** symbol tables and **zero-context** hunk
 overlap—not a HEAD-only map applied to numstat totals. Detail:

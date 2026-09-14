@@ -24,6 +24,8 @@ pub struct Args {
     pub format: OutputFormat,
     /// When true, print help and exit successfully.
     pub help: bool,
+    /// Bitset of scalar flags already seen during parse (not include/exclude).
+    pub(crate) seen_flags: u32,
 }
 
 /// Parses process arguments.
@@ -49,6 +51,7 @@ fn help_args() -> Args {
         options: Options::default(),
         format: OutputFormat::Text,
         help: true,
+        seen_flags: 0,
     }
 }
 
@@ -59,6 +62,7 @@ fn parse_required_args(argv: &[String]) -> Result<Args, String> {
         options: Options::default(),
         format: OutputFormat::Text,
         help: false,
+        seen_flags: 0,
     };
     let mut index = 1;
     while index < argv.len() {

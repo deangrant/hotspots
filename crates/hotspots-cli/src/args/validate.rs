@@ -12,6 +12,7 @@ pub(super) fn validate(parsed: &Args) -> Result<(), String> {
 fn validate_required(parsed: &Args) -> Result<(), String> {
     require_non_empty(&parsed.log, "-l/--log")?;
     require_non_empty(&parsed.vcs, "-c/--vcs")?;
+    require_known_vcs(parsed)?;
     require_repo_for_function(parsed)
 }
 
@@ -32,6 +33,13 @@ fn require_non_empty(value: &str, flag: &str) -> Result<(), String> {
         return Err(format!("missing required `{flag}`"));
     }
     Ok(())
+}
+
+fn require_known_vcs(parsed: &Args) -> Result<(), String> {
+    match parsed.vcs.as_str() {
+        "git" | "git2" => Ok(()),
+        other => Err(format!("unknown vcs `{other}`; expected one of: git, git2")),
+    }
 }
 
 fn require_repo_for_function(parsed: &Args) -> Result<(), String> {

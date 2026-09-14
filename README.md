@@ -72,7 +72,8 @@ Illustrative sample (numbers are made up and only comparable within one log):
 
 Treat every column as an investigation signal, not as blame or defect
 probability. Use `--format json` when you need the same fields as a JSON array
-of objects for scripting.
+of objects for scripting. JSON object values are always **strings** (the same
+cell text as the table), including numeric metrics.
 
 ## Generate a Git log
 
@@ -129,7 +130,7 @@ resolver that calls `git` against `--repo`.
 | `--grain` | Behavior |
 | --------- | -------- |
 | `file` (default) | Each path in the numstat log is one entity |
-| `function` | Expands Rust (`*.rs`) changes to `path::symbol` (function names and `Type::method`) |
+| `function` | Expands Rust (`*.rs`) changes to `path::symbol` (free functions, `impl` methods, and trait methods, including nested modules) |
 
 Function grain requires a Git work tree via `--repo`. Revisions in the log must
 exist in that repository. Attribution uses **per-commit** symbol tables
@@ -141,9 +142,11 @@ numstat totals.
 
 Deleted or renamed-away paths load symbols from the parent blob (`REV^:PATH`).
 If the path is missing on both sides, the run **fails closed**. Non-Rust paths
-are **dropped** (stderr reports the count). Changes with no line hunks (for
-example mode-only diffs) or whose hunks miss all `fn` / `impl` symbols are also
-dropped with a stderr count.
+are **dropped** (stderr reports the count). syn attributes free functions,
+`impl` methods, and trait methods only — not macros, `const`, types, statics,
+or other items — so edits that only touch those may miss all symbols and drop
+with a stderr count. Changes with no line hunks (for example mode-only diffs)
+are also dropped with a stderr count.
 
 Failures (missing `--repo`, git errors, unparsable `.rs`, or a blob/patch over
 the 16 MiB git stdout cap) **abort** the run. There is no silent fallback to

@@ -74,11 +74,24 @@ fn apply_flag(
     flag: &str,
     parsed: &mut Args,
 ) -> Result<usize, String> {
+    mark_seen_if_scalar(kind, flag, parsed)?;
     match (kind as usize) / 6 {
         0 => apply_low(kind, argv, index, flag, parsed),
         1 => apply_mid(kind, argv, index, flag, parsed),
         _ => apply_high(kind, argv, index, flag, parsed),
     }
+}
+
+fn mark_seen_if_scalar(kind: Flag, flag: &str, parsed: &mut Args) -> Result<(), String> {
+    if matches!(kind, Flag::Exclude | Flag::Include) {
+        return Ok(());
+    }
+    let bit = 1_u32 << (kind as u32);
+    if parsed.seen_flags & bit != 0 {
+        return Err(format!("duplicate `{flag}`"));
+    }
+    parsed.seen_flags |= bit;
+    Ok(())
 }
 
 fn apply_low(

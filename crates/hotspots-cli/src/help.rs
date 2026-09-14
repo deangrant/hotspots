@@ -33,10 +33,13 @@ Options:
       --repo PATH                Git work tree (required for function grain)
   -h, --help                     Show this help
 
-Default output is an aligned terminal table. Use `--format json` for scripting.
+Default output is an aligned terminal table. Use `--format json` for scripting
+(JSON object values are always strings, including numeric metrics).
 
 Function grain expands `*.rs` changes to `path::symbol` via git + syn using
-`--repo`. Non-Rust paths are dropped. Revisions in the log must exist in
+`--repo`. It attributes free functions, impl methods, and trait methods
+(including nested modules); macros, const, types, statics, and other items are
+not attributed. Non-Rust paths are dropped. Revisions in the log must exist in
 `--repo`. Accuracy uses per-commit symbol tables and zero-context hunk overlap
 (not HEAD-only maps). Restrict with `--include` when the log mixes languages.
 

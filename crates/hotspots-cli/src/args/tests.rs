@@ -156,3 +156,46 @@ fn grain_defaults_to_file_and_requires_repo_for_function() {
     }));
     assert!(parse_args(&argv(&["-l", "x", "-c", "git2", "--grain", "layer"])).is_err());
 }
+
+#[test]
+fn rejects_unknown_vcs_at_parse_time() {
+    let err = parse_args(&argv(&["-l", "x", "-c", "svn"]));
+    assert!(err.as_ref().is_err_and(|e| e.contains("unknown vcs")));
+    assert!(parse_args(&argv(&["-l", "x", "-c", "hg"])).is_err());
+}
+
+#[test]
+fn rejects_duplicate_scalar_flags() {
+    assert!(
+        parse_args(&argv(&["-l", "a", "-c", "git", "-c", "git2"]))
+            .is_err_and(|e| { e.contains("duplicate") })
+    );
+    assert!(
+        parse_args(&argv(&[
+            "-l", "a", "-c", "git2", "-a", "risk", "-a", "summary"
+        ]))
+        .is_err_and(|e| e.contains("duplicate"))
+    );
+}
+
+#[test]
+fn allows_repeated_exclude_and_include() {
+    let parsed = parse_args(&argv(&[
+        "-l",
+        "log.txt",
+        "-c",
+        "git2",
+        "--exclude",
+        "vendor",
+        "--exclude",
+        "target",
+        "--include",
+        "src",
+        "--include",
+        "crates",
+    ]));
+    assert!(parsed.is_ok_and(|p| {
+        p.options.exclude == vec![String::from("vendor"), String::from("target")]
+            && p.options.include == vec![String::from("src"), String::from("crates")]
+    }));
+}
