@@ -232,6 +232,8 @@ flowchart TB
 | Metrics are indicators, not blame | Risk and ownership scores mean “investigate” |
 | `hotspots` does not invoke `git` | Git + `syn` stay in `hotspots-rs` behind `SymbolResolver` |
 | Change streams cap at `MAX_CHANGE_ROWS` (1_000_000) | Bounds memory for large exports |
+| Git stdout/stderr byte caps (16 MiB / 1 MiB) | Prevents OOM from huge blobs or patches |
+| Function-grain cache stores symbols, not source text | Drops blob bodies after `syn` parse |
 | No `#[allow]`; use `#[expect(..., reason = "...")]` | Matches workspace lints; see [rust-style-guide](../skills/rust-style-guide/SKILL.md) |
 | Workspace members are `hotspots`, `hotspots-cli`, and `hotspots-rs` | Update this document if you add or rename crates |
 
@@ -250,8 +252,10 @@ on success.
 
 `hotspots` is a local analysis tool. The binary does not open network sockets or
 execute untrusted code from the log. Residual risk is local filesystem read of
-the supplied log and, under function grain, read of `--repo` through bounded
-`git` subprocesses—not remote code execution.
+the supplied log (a near-cap change vector is still held fully in memory) and,
+under function grain, read of `--repo` through time- and byte-capped `git`
+subprocesses that cache parsed symbols rather than full blob text—not remote
+code execution.
 
 ## Verification and agent layout
 

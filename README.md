@@ -139,10 +139,10 @@ are **dropped** (stderr reports the count). Changes with no line hunks (for
 example mode-only diffs) or whose hunks miss all `fn` / `impl` symbols are also
 dropped with a stderr count.
 
-Failures (missing `--repo`, git errors, unparsable `.rs`) **abort** the run.
-There is no silent fallback to file grain. Restrict mixed-language logs with
-`--include`. The `git` binary comes from `PATH`, or from `GIT_EXECUTABLE` when
-set.
+Failures (missing `--repo`, git errors, unparsable `.rs`, or a blob/patch over
+the 16 MiB git stdout cap) **abort** the run. There is no silent fallback to
+file grain. Restrict mixed-language logs with `--include`. The `git` binary
+comes from `PATH`, or from `GIT_EXECUTABLE` when set.
 
 ```bash
 hotspots -l logfile.log -c git2 --grain function --repo . -n 1 -r 20
@@ -275,6 +275,7 @@ On failure the CLI prints `error: …` to stderr. Common cases:
 | Wrong or incomplete log format | Re-export with the matching `-c git` or `git2` recipe; avoid rename numstat lines |
 | `--grain function` without `--repo` | Pass `--repo` to a work tree that contains the log’s revisions |
 | Git or `syn` failure under function grain | Fix the repo, revision coverage, or Rust sources; the tool will not fall back to file grain |
+| Git stdout exceeds byte cap under function grain | Split or exclude huge generated `.rs` blobs; narrow the log with `--after` / `--include` |
 | Unknown `-a` name | Use a name from `hotspots --help` |
 | Churn/ownership analysis on a log without numstat | Export with `--numstat` |
 
