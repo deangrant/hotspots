@@ -4,9 +4,7 @@ use std::collections::BTreeMap;
 
 use crate::error::{Error, Result};
 use crate::model::Change;
-use crate::symbols::types::{FileDiff, Hunk, SymbolFact, entity_id};
-
-pub use crate::symbols::types::ExpandStats;
+use crate::symbols::types::{ExpandStats, FileDiff, Hunk, SymbolFact, entity_id};
 
 /// Expands each change using the matching [`FileDiff`] keyed by `(rev, path)`.
 ///
@@ -234,7 +232,7 @@ mod tests {
     #[test]
     fn missing_diff_errors() {
         let change = Change::new("1", "Ada", "2024-01-01", "a.rs", Some(1), Some(0));
-        let expanded = expand_with_diffs(&[change], &BTreeMap::new());
+        let expanded = expand_with_diffs(std::slice::from_ref(&change), &BTreeMap::new());
         assert!(expanded.is_err_and(|e| e.to_string().contains("missing symbol diff")));
     }
 
@@ -249,5 +247,24 @@ mod tests {
             hunks: vec![],
         };
         assert!(expand_file_change(&change, &diff).is_empty());
+    }
+
+    #[test]
+    fn attributes_deletes_using_old_symbols() {
+        let change = Change::new("abc", "Ada", "2024-01-01", "a.rs", Some(0), Some(2));
+        let diff = FileDiff {
+            rev: String::from("abc"),
+            path: String::from("a.rs"),
+            symbols_new: vec![fact("foo", 1, 10)],
+            symbols_old: vec![fact("foo", 1, 10), fact("bar", 11, 20)],
+            hunks: vec![Hunk {
+                old_start: 12,
+                old_count: 2,
+                new_start: 0,
+                new_count: 0,
+            }],
+        };
+        let rows = expand_file_change(&change, &diff);
+        assert!(rows.iter().any(|r| r.entity == "a.rs::bar" && r.deleted == Some(2)));
     }
 }

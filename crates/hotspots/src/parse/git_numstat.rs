@@ -62,13 +62,14 @@ mod tests {
 -\t-\tbin/tool
 ";
         let parsed = GitNumstatParser.parse(&mut Cursor::new(log.as_bytes()));
-        assert!(parsed.is_ok(), "{:?}", parsed.err());
-        let changes = parsed.unwrap_or_else(|_| Vec::new());
-        assert_eq!(changes.len(), 2);
-        assert_eq!(changes[0].entity, "src/a.rs");
-        assert_eq!(changes[0].added, Some(10));
-        assert_eq!(changes[1].added, Some(0));
-        assert_eq!(changes[1].deleted, Some(0));
+        assert!(matches!(
+            &parsed,
+            Ok(c) if c.len() == 2
+                && c[0].entity == "src/a.rs"
+                && c[0].added == Some(10)
+                && c[1].added == Some(0)
+                && c[1].deleted == Some(0)
+        ));
     }
 
     #[test]

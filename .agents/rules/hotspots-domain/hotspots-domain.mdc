@@ -1,0 +1,20 @@
+---
+description: hotspots domain — log contracts, grain fail-closed, indicator semantics
+globs:
+  - crates/hotspots/**/*.rs
+  - crates/hotspots-rs/**/*.rs
+  - crates/hotspots-cli/**/*.rs
+alwaysApply: false
+---
+
+# hotspots domain
+
+- Preserve log-format contracts for `-c git` and `-c git2`; do not invent
+  silent format guessing.
+- Function grain must stay fail-closed — no silent fallback to file grain on
+  missing repo, git errors, or unparsable `.rs`.
+- Risk, ownership, and related scores are **indicators** (investigate), not
+  blame or defect probability.
+- Prefer [README.md](../../../README.md) and CLI help as UX source of truth.
+- Read [`.agents/skills/hotspots-domain/SKILL.md`](../../skills/hotspots-domain/SKILL.md)
+  before changing parsers, analyses, grain, or CLI flag semantics.

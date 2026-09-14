@@ -104,12 +104,13 @@ mod tests {
 0\t0\tREADME.md
 ";
         let parsed = GitLegacyParser.parse(&mut Cursor::new(log.as_bytes()));
-        assert!(parsed.is_ok(), "{:?}", parsed.err());
-        let changes = parsed.unwrap_or_else(|_| Vec::new());
-        assert_eq!(changes.len(), 2);
-        assert_eq!(changes[0].author, "Ada Lovelace");
-        assert_eq!(changes[0].date, "2024-01-02");
-        assert_eq!(changes[1].entity, "README.md");
+        assert!(matches!(
+            &parsed,
+            Ok(c) if c.len() == 2
+                && c[0].author == "Ada Lovelace"
+                && c[0].date == "2024-01-02"
+                && c[1].entity == "README.md"
+        ));
     }
 
     #[test]
@@ -127,11 +128,12 @@ mod tests {
 1\t0\ta.rs
 ";
         let parsed = GitLegacyParser.parse(&mut Cursor::new(log.as_bytes()));
-        assert!(parsed.is_ok(), "{:?}", parsed.err());
-        let changes = parsed.unwrap_or_default();
-        assert_eq!(changes.len(), 1);
-        assert_eq!(changes[0].author, "Ada");
-        assert_eq!(changes[0].date, "2024-01-01");
-        assert_eq!(changes[0].entity, "a.rs");
+        assert!(matches!(
+            &parsed,
+            Ok(c) if c.len() == 1
+                && c[0].author == "Ada"
+                && c[0].date == "2024-01-01"
+                && c[0].entity == "a.rs"
+        ));
     }
 }

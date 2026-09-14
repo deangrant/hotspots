@@ -84,12 +84,7 @@ jobs:
 
       - name: Clippy
         if: steps.pkgs.outputs.count != '0'
-        run: |
-          extra=()
-          if [ -f Cargo.lock ]; then
-            extra+=(--locked)
-          fi
-          cargo clippy --workspace --all-targets --all-features "${extra[@]}" -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
   docs:
     name: rustdoc with warnings denied
@@ -120,12 +115,7 @@ jobs:
         if: steps.pkgs.outputs.count != '0'
         env:
           RUSTDOCFLAGS: "-D warnings"
-        run: |
-          extra=()
-          if [ -f Cargo.lock ]; then
-            extra+=(--locked)
-          fi
-          cargo doc --workspace --all-features --no-deps "${extra[@]}"
+        run: cargo doc --workspace --all-features --no-deps --locked
 
   conventions:
     runs-on: ubuntu-latest

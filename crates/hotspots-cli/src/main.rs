@@ -7,12 +7,15 @@ use std::fs::File;
 use std::io::{self, BufReader, Write};
 use std::process::ExitCode;
 
-use hotspots::{ExpandStats, Grain, SymbolResolver, analyze_log_with_resolver, write_table};
+use hotspots::{
+    ExpandStats, Grain, OutputFormat, SymbolResolver, Table, analyze_log_with_resolver, write_table,
+};
 use hotspots_rs::RustGitSynResolver;
 
 use crate::args::{Args, parse_args};
 use crate::help::help_text;
 
+#[cfg(not(test))]
 fn main() -> ExitCode {
     exit_from(run_with_args(&std::env::args().collect::<Vec<_>>()))
 }
@@ -57,18 +60,30 @@ fn execute(parsed: &Args) -> Result<(), String> {
     let (table, stats) = run_analysis(parsed, &mut reader)?;
     note_dropped_paths(stats);
     let mut stdout = io::stdout().lock();
-    write_table(&mut stdout, &table, parsed.format).map_err(|e| e.to_string())?;
-    Ok(())
+    emit_table(&mut stdout, &table, parsed.format)
+}
+
+fn emit_table(out: &mut dyn Write, table: &Table, format: OutputFormat) -> Result<(), String> {
+    write_table(out, table, format).map_err(display_err)
+}
+
+fn display_err(err: impl std::fmt::Display) -> String {
+    err.to_string()
 }
 
 fn run_analysis(
     parsed: &Args,
     reader: &mut BufReader<File>,
-) -> Result<(hotspots::Table, ExpandStats), String> {
+) -> Result<(Table, ExpandStats), String> {
     let resolver = function_resolver(parsed.options.grain);
-    let resolver_ref: Option<&dyn SymbolResolver> = resolver.as_ref().map(|r| r as _);
+    let resolver_ref = resolver_as_trait(resolver.as_ref());
     analyze_log_with_resolver(reader, &parsed.vcs, &parsed.options, resolver_ref)
-        .map_err(|e| e.to_string())
+        .map_err(display_err)
+}
+
+fn resolver_as_trait(resolver: Option<&RustGitSynResolver>) -> Option<&dyn SymbolResolver> {
+    let resolver = resolver?;
+    Some(resolver)
 }
 
 const fn function_resolver(grain: Grain) -> Option<RustGitSynResolver> {
@@ -99,10 +114,27 @@ fn note_dropped_paths(stats: ExpandStats) {
 mod tests {
     use super::*;
 
+    struct FailWrite;
+
+    impl Write for FailWrite {
+        fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+            Err(io::Error::other("fail"))
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
     #[test]
     fn help_runs_cleanly() {
         let argv = vec![String::from("hotspots"), String::from("--help")];
         assert!(run_with_args(&argv).is_ok());
+    }
+
+    #[test]
+    fn exit_from_maps_ok_and_err() {
+        assert_eq!(exit_from(Ok(())), ExitCode::SUCCESS);
+        assert_eq!(exit_from(Err(String::from("boom"))), ExitCode::FAILURE);
     }
 
     #[test]
@@ -183,5 +215,19 @@ mod tests {
         });
         assert!(function_resolver(Grain::Function).is_some());
         assert!(function_resolver(Grain::File).is_none());
+    }
+
+    #[test]
+    fn resolver_trait_and_emit_error_paths() {
+        let function = function_resolver(Grain::Function);
+        assert!(resolver_as_trait(function.as_ref()).is_some());
+        let file = function_resolver(Grain::File);
+        assert!(resolver_as_trait(file.as_ref()).is_none());
+        assert_eq!(display_err("boom"), "boom");
+        assert_eq!(display_err(hotspots::Error::msg("err")), "err");
+        assert!(FailWrite.flush().is_ok());
+
+        let table = Table::with_headers(["entity"]);
+        assert!(emit_table(&mut FailWrite, &table, OutputFormat::Json).is_err());
     }
 }

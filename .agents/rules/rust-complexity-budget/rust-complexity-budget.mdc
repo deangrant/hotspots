@@ -1,0 +1,15 @@
+---
+description: Rust complexity budget — clippy thresholds, file size, CC dogfood
+globs: "**/*.rs"
+alwaysApply: false
+---
+
+# Rust complexity budget
+
+- Keep functions under [`clippy.toml`](../../../clippy.toml): cognitive **8**,
+  type complexity **200**, function **50** lines.
+- Keep `.rs` files at or under **500** physical lines.
+- Prefer extracting helpers over `#[allow(...)]`. Suppressions must be
+  `#[expect(..., reason = "...")]`.
+- Dogfood CRAP complexity stays manageable (**CC ≤ 5** at full line coverage);
+  do not re-merge intentional CC≤5 splits solely for DRY.

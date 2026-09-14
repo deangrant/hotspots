@@ -7,6 +7,8 @@ use std::ffi::OsString;
 use std::io::Read;
 use std::path::Path;
 use std::process::{Child, Command, ExitStatus, Stdio};
+#[cfg(test)]
+use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -14,6 +16,9 @@ use hotspots::{Error, Result};
 
 /// Maximum wall time allowed for a single `git` invocation.
 const GIT_TIMEOUT: Duration = Duration::from_secs(30);
+
+#[cfg(test)]
+static TEST_GIT_EXECUTABLE: Mutex<Option<OsString>> = Mutex::new(None);
 
 /// Runs git commands in a repository.
 pub trait GitRunner {
@@ -73,11 +78,21 @@ fn spawn_git(repo: &Path, args: &[&str]) -> Result<Child> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| Error::git(format!("failed to run git: {e}")))
+        .map_err(|err| spawn_git_err(&err))
+}
+
+#[inline(never)]
+fn spawn_git_err(err: &std::io::Error) -> Error {
+    Error::git(format!("failed to run git: {err}"))
 }
 
 fn take_pipe<T>(pipe: Option<T>, stream: &str) -> Result<T> {
-    pipe.ok_or_else(|| Error::git(format!("git {stream} pipe missing")))
+    pipe.ok_or_else(|| pipe_missing_err(stream))
+}
+
+#[inline(never)]
+fn pipe_missing_err(stream: &str) -> Error {
+    Error::git(format!("git {stream} pipe missing"))
 }
 
 fn spawn_reader(
@@ -93,10 +108,11 @@ fn join_reader(
     handle: thread::JoinHandle<std::io::Result<Vec<u8>>>,
     stream: &str,
 ) -> Result<Vec<u8>> {
-    handle
-        .join()
-        .map_err(|_| Error::git(format!("git {stream} reader panicked")))?
-        .map_err(|e| Error::git(format!("failed to read git {stream}: {e}")))
+    match handle.join() {
+        Ok(Ok(bytes)) => Ok(bytes),
+        Ok(Err(err)) => Err(Error::git(format!("failed to read git {stream}: {err}"))),
+        Err(_) => Err(Error::git(format!("git {stream} reader panicked"))),
+    }
 }
 
 fn finish_git_status(
@@ -113,6 +129,12 @@ fn finish_git_status(
 }
 
 fn git_executable() -> OsString {
+    #[cfg(test)]
+    if let Ok(guard) = TEST_GIT_EXECUTABLE.lock()
+        && let Some(exe) = guard.as_ref()
+    {
+        return exe.clone();
+    }
     std::env::var_os("GIT_EXECUTABLE").unwrap_or_else(|| OsString::from("git"))
 }
 
@@ -182,6 +204,7 @@ fn apply_wait_poll(
     }
 }
 
+#[inline(never)]
 fn kill_timed_out(child: &mut Child, args: &[&str], timeout: Duration) -> Result<ExitStatus> {
     let _ = child.kill();
     let _ = child.wait();
@@ -334,5 +357,92 @@ mod tests {
         let mut child = children.remove(0);
         let err = wait_child(&mut child, &["sleep"], Duration::from_millis(50));
         assert!(err.is_err_and(|e| e.to_string().contains("timed out")));
+    }
+
+    #[test]
+    fn apply_wait_poll_timeout_kills_child() {
+        let spawned = Command::new("sleep")
+            .arg("30")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
+        assert!(spawned.is_ok(), "spawn sleep failed");
+        let mut children: Vec<_> = spawned.ok().into_iter().collect();
+        assert_eq!(children.len(), 1);
+        let mut child = children.remove(0);
+        let result = apply_wait_poll(
+            &mut child,
+            &["sleep"],
+            Duration::from_secs(1),
+            WaitPoll::TimedOut,
+        );
+        assert!(result.is_some_and(|r| r.is_err_and(|e| e.to_string().contains("timed out"))));
+    }
+
+    #[test]
+    fn take_pipe_and_spawn_error_paths() {
+        assert!(
+            take_pipe::<()>(None, "stdout").is_err_and(|e| e.to_string().contains("pipe missing"))
+        );
+        assert!(take_pipe(Some(()), "stdout").is_ok());
+        assert!(pipe_missing_err("stderr").to_string().contains("pipe missing"));
+        assert!(
+            spawn_git_err(&std::io::Error::other("boom"))
+                .to_string()
+                .contains("failed to run git")
+        );
+        let join_ok = thread::spawn(|| Ok(b"ok".to_vec()));
+        assert!(join_reader(join_ok, "stdout").is_ok_and(|b| b == b"ok"));
+        let join_io = thread::spawn(|| Err(std::io::Error::other("read fail")));
+        assert!(
+            join_reader(join_io, "stderr").is_err_and(|e| e.to_string().contains("failed to read"))
+        );
+        let join_panic = thread::spawn(|| -> std::io::Result<Vec<u8>> {
+            #[expect(clippy::panic, reason = "intentional panic to cover join Err arm")]
+            {
+                panic!("reader boom");
+            }
+        });
+        assert!(
+            join_reader(join_panic, "stdout").is_err_and(|e| e.to_string().contains("panicked"))
+        );
+    }
+
+    #[test]
+    fn system_git_session_and_failure_status() {
+        let status = Command::new("false").status();
+        assert!(status.as_ref().is_ok_and(|s| !s.success()));
+        let mut statuses: Vec<_> = status.ok().into_iter().collect();
+        assert_eq!(statuses.len(), 1);
+        let status = statuses.remove(0);
+        assert!(
+            finish_git_status(status, &["false"], Vec::new(), b"fatal: boom".to_vec())
+                .is_err_and(|e| e.to_string().contains("boom"))
+        );
+        assert!(
+            finish_git_status(status, &["false"], Vec::new(), vec![0xff, 0xfe])
+                .is_err_and(|e| e.to_string().contains("not valid UTF-8"))
+        );
+        let outside = SystemGit.run(Path::new("/tmp"), &["rev-parse", "--is-inside-work-tree"]);
+        assert!(outside.is_err());
+
+        let previous = TEST_GIT_EXECUTABLE.lock().ok().and_then(|mut guard| {
+            guard.replace(OsString::from("/nonexistent/hotspots-missing-git"))
+        });
+        let spawn_err = SystemGit.run(Path::new("/tmp"), &["status"]);
+        if let Ok(mut guard) = TEST_GIT_EXECUTABLE.lock() {
+            *guard = previous;
+        }
+        assert!(spawn_err.is_err_and(|e| e.to_string().contains("failed to run git")));
+    }
+
+    #[test]
+    fn covers_expand_missing_diff_in_dep_crate() {
+        let change = hotspots::Change::new("1", "Ada", "2024-01-01", "a.rs", Some(1), Some(0));
+        let expanded = hotspots::symbols::expand_with_diffs(
+            std::slice::from_ref(&change),
+            &std::collections::BTreeMap::new(),
+        );
+        assert!(expanded.is_err_and(|e| e.to_string().contains("missing symbol diff")));
     }
 }

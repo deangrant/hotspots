@@ -135,13 +135,19 @@ fn load_parsed_hunks(
     rev: &str,
     path: &str,
 ) -> Result<Vec<hotspots::symbols::Hunk>> {
-    let unified = show_hunks(cache.git, cache.repo, rev, path)
-        .map_err(|e| Error::msg(format!("cannot load hunks for `{path}` at `{rev}`: {e}")))?;
+    let unified = match show_hunks(cache.git, cache.repo, rev, path) {
+        Ok(unified) => unified,
+        Err(err) => return Err(hunks_load_err(path, rev, &err)),
+    };
     let hunks = parse_hunks(&unified);
     if hunks.is_empty() {
         return Err(Error::msg(format!("no hunks for `{path}` at `{rev}`")));
     }
     Ok(hunks)
+}
+
+fn hunks_load_err(path: &str, rev: &str, err: &Error) -> Error {
+    Error::msg(format!("cannot load hunks for `{path}` at `{rev}`: {err}"))
 }
 
 /// Loads new/old symbol tables, falling back to parent-only for deletes.
@@ -169,7 +175,7 @@ fn load_both_symbol_sides(
     Vec<hotspots::symbols::SymbolFact>,
     Vec<hotspots::symbols::SymbolFact>,
 )> {
-    let symbols_new = symbols_from_source(path, new_src)?;
+    let symbols_new = parse_symbols(path, new_src)?;
     let symbols_old = load_old_symbols(cache, rev, path)?;
     Ok((symbols_new, symbols_old))
 }
@@ -183,12 +189,15 @@ fn load_delete_only_symbols(
     Vec<hotspots::symbols::SymbolFact>,
 )> {
     let parent = format!("{rev}^");
-    let old_src = cache.show(&parent, path).map_err(|e| {
-        Error::msg(format!(
-            "cannot load `{path}` at `{rev}` or `{parent}`: {e}"
-        ))
-    })?;
-    let symbols_old = symbols_from_source(path, &old_src)?;
+    let old_src = match cache.show(&parent, path) {
+        Ok(src) => src,
+        Err(err) => {
+            return Err(Error::msg(format!(
+                "cannot load `{path}` at `{rev}` or `{parent}`: {err}"
+            )));
+        }
+    };
+    let symbols_old = parse_symbols(path, &old_src)?;
     Ok((Vec::new(), symbols_old))
 }
 
@@ -201,7 +210,11 @@ fn load_old_symbols(
     let Ok(src) = cache.show(&parent, path) else {
         return Ok(Vec::new());
     };
-    symbols_from_source(path, &src)
+    parse_symbols(path, &src)
+}
+
+fn parse_symbols(path: &str, source: &str) -> Result<Vec<hotspots::symbols::SymbolFact>> {
+    symbols_from_source(path, source)
 }
 
 #[cfg(test)]
@@ -425,5 +438,56 @@ mod tests {
     fn map_git_unexpected_args_error() {
         let git = MapGit::default();
         assert!(git.run(Path::new("/repo"), &["mystery"]).is_err());
+    }
+
+    #[test]
+    fn hunk_load_and_syn_parse_errors() {
+        assert!(
+            hunks_load_err("a.rs", "abc", &Error::git("boom"))
+                .to_string()
+                .contains("cannot load hunks")
+        );
+        assert!(parse_symbols("a.rs", "fn not rust {{{").is_err());
+
+        let mut ok = work_tree_ok();
+        ok.insert(String::from("show bad:a.rs"), String::from("fn broken {{{"));
+        ok.insert(
+            String::from("show bad^:a.rs"),
+            String::from("fn alpha() {}\n"),
+        );
+        let err = HashMap::from([
+            (
+                String::from("diff-tree -U0 bad^ bad -- a.rs"),
+                String::from("no parent"),
+            ),
+            (
+                String::from("show -U0 --format= bad -- a.rs"),
+                String::from("also fail"),
+            ),
+        ]);
+        let resolver = RustGitSynResolver::with_git(MapGit { ok, err });
+        assert!(resolver.expand(&[change("bad", Some(1), Some(0))], Path::new("/repo")).is_err());
+
+        let mut ok = work_tree_ok();
+        ok.insert(
+            String::from("show syn:a.rs"),
+            String::from("fn alpha() {}\n"),
+        );
+        let err = HashMap::from([
+            (
+                String::from("diff-tree -U0 syn^ syn -- a.rs"),
+                String::from("fail"),
+            ),
+            (
+                String::from("show -U0 --format= syn -- a.rs"),
+                String::from("fail"),
+            ),
+        ]);
+        let resolver = RustGitSynResolver::with_git(MapGit { ok, err });
+        assert!(
+            resolver
+                .expand(&[change("syn", Some(1), Some(0))], Path::new("/repo"))
+                .is_err_and(|e| e.to_string().contains("cannot load hunks"))
+        );
     }
 }
