@@ -139,6 +139,7 @@ fn parse_errors_and_empty() {
 
 #[test]
 fn legacy_header_errors() {
+    // dry-rs:ignore. Parallel is_err header fixtures; structural twins are intentional.
     assert!(GitLegacyParser.parse(&mut Cursor::new("[rev missing date")).is_err());
     assert!(GitLegacyParser.parse(&mut Cursor::new("[] Ada 2024-01-01 x")).is_err());
     assert!(GitLegacyParser.parse(&mut Cursor::new("[abc] 2024-01-01 subject")).is_err());

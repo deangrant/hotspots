@@ -131,6 +131,7 @@ mod tests {
 
     #[test]
     fn parses_legacy_git_log() {
+        // dry-rs:ignore. Parallel legacy parse/assert fixtures; structural twins are intentional.
         let log = "\
 [abc123] Ada Lovelace 2024-01-02 fix bug
 4\t1\tsrc/a.rs
@@ -149,6 +150,7 @@ mod tests {
 
     #[test]
     fn rejects_malformed_headers() {
+        // dry-rs:ignore. Parallel is_err header fixtures; structural twins are intentional.
         assert!(GitLegacyParser.parse(&mut Cursor::new("[abc] subject without date")).is_err());
         assert!(GitLegacyParser.parse(&mut Cursor::new("[abc]Ada2024-01-01 no-space")).is_err());
         assert!(GitLegacyParser.parse(&mut Cursor::new("[abc] short")).is_err());
@@ -157,6 +159,7 @@ mod tests {
 
     #[test]
     fn delimited_date_keeps_date_like_author_names() {
+        // dry-rs:ignore. Parallel legacy parse/assert fixtures; structural twins are intentional.
         let log = "\
 [abc123] Ada 2024-01-01 Fan <2024-01-02> subject here
 1\t0\ta.rs
@@ -173,6 +176,7 @@ mod tests {
 
     #[test]
     fn undelimited_subject_date_keeps_first_iso_token() {
+        // dry-rs:ignore. Parallel legacy parse/assert fixtures; structural twins are intentional.
         let log = "\
 [abc123] Ada Lovelace 2024-01-02 fixed 2023-12-01 regression
 1\t0\ta.rs
@@ -188,6 +192,7 @@ mod tests {
 
     #[test]
     fn ignores_non_iso_angle_brackets() {
+        // dry-rs:ignore. Parallel legacy parse/assert fixtures; structural twins are intentional.
         let log = "\
 [abc123] Ada <not-a-date> 2024-01-02 subject
 1\t0\ta.rs
@@ -203,6 +208,7 @@ mod tests {
 
     #[test]
     fn glued_angle_date_falls_back_to_bare_iso() {
+        // dry-rs:ignore. Parallel legacy parse/assert fixtures; structural twins are intentional.
         let log = "\
 [abc123] Ada<2024-01-01>Fan 2024-01-02 subject
 1\t0\ta.rs

@@ -1,8 +1,8 @@
 ---
 name: verify-gates
 description: >-
-  Run hotspots local gates: check.sh, llvm-cov, then CRAP. Use for /verify,
-  stop-hook follow-ups, or when the user asks to run the pipeline.
+  Run hotspots local gates: check.sh, dry-rs, llvm-cov, then CRAP. Use for
+  /verify, stop-hook follow-ups, or when the user asks to run the pipeline.
 ---
 
 # Verify gates
@@ -22,7 +22,20 @@ from the failed step (or the top).
    ./scripts/check.sh
    ```
 
-2. Line coverage LCOV (needs `cargo-llvm-cov` and `llvm-tools-preview`):
+2. Structural clones (`dry-rs` from [dry-score](https://github.com/deangrant/dry-score)
+   source via [`scripts/dry-gate.sh`](../../../scripts/dry-gate.sh); no
+   crates.io install):
+
+   ```bash
+   ./scripts/dry-gate.sh
+   ```
+
+   Resolves the tool tree from `DRY_SCORE_DIR`, else sibling `../dry-score`,
+   else a shallow clone of the pin in
+   [`scripts/dry-score.rev`](../../../scripts/dry-score.rev) under `.tools/`.
+   Fails when any finding is reported (`--fail-on-findings`).
+
+3. Line coverage LCOV (needs `cargo-llvm-cov` and `llvm-tools-preview`):
 
    ```bash
    cargo llvm-cov --workspace --all-features \
@@ -30,7 +43,7 @@ from the failed step (or the top).
      --fail-under-lines 100
    ```
 
-3. CRAP gate (`crap-rs` from [crap-score](https://github.com/deangrant/crap-score)
+4. CRAP gate (`crap-rs` from [crap-score](https://github.com/deangrant/crap-score)
    source via [`scripts/crap-gate.sh`](../../../scripts/crap-gate.sh); no
    crates.io install):
 
@@ -43,5 +56,6 @@ from the failed step (or the top).
    [`scripts/crap-score.rev`](../../../scripts/crap-score.rev) under `.tools/`.
    Fails when any function score is strictly above `--threshold strict` (8).
 
-CI enforces the same coverage and CRAP gates via
+CI enforces dry via [`.github/workflows/dry.yml`](../../../.github/workflows/dry.yml)
+and coverage/CRAP via
 [`.github/workflows/coverage.yml`](../../../.github/workflows/coverage.yml).

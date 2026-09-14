@@ -7,6 +7,8 @@ cd "$root"
 
 ./scripts/check.sh
 
+./scripts/dry-gate.sh
+
 cargo llvm-cov --workspace --all-features \
   --lcov --output-path lcov.info \
   --fail-under-lines 100

@@ -5,6 +5,6 @@ set -eu
 cat >/dev/null || true
 
 printf '%s\n' '{
-  "additional_context": "hotspots: /verify runs check.sh, llvm-cov, then CRAP (see verify-gates). /design-scan uses rust-style-guide + rust-solid-design. Read hotspots-domain before changing parsers, analyses, grain, or CLI."
+  "additional_context": "hotspots: /verify runs check.sh, dry-rs, llvm-cov, then CRAP (see verify-gates). /design-scan uses rust-style-guide + rust-solid-design. Read hotspots-domain before changing parsers, analyses, grain, or CLI."
 }'
 exit 0
