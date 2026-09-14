@@ -39,8 +39,8 @@ blame or defect probability.
 - Keep functions under [`clippy.toml`](clippy.toml) thresholds (cognitive 8, type 200, function 50 lines).
 - Keep `.rs` files at or under 500 lines.
 
-**Runtime:** Rust toolchain `1.94.0`. Full local `/verify` is `./scripts/check.sh` then
-llvm-cov `--fail-under-lines 100` (see
+**Runtime:** Rust toolchain `1.94.0`. Full local `/verify` is `./scripts/check.sh`,
+llvm-cov `--fail-under-lines 100`, then `./scripts/crap-gate.sh` (see
 [verify-gates](.agents/skills/verify-gates/SKILL.md)).
 
 ## Instruction Precedence
@@ -84,8 +84,10 @@ If a skill suggests something a rule forbids, the rule wins.
 - Putting `git` or `syn` into `hotspots` instead of `hotspots-rs` behind `SymbolResolver`.
 - HEAD-only symbol maps instead of per-commit tables plus zero-context (`-U0`) hunk overlap.
 - Re-merging CC≤5 dispatch splits that were extracted for Clippy, then fighting complexity budgets.
-- Relaxing Clippy thresholds or the llvm-cov 100% line gate solely to hide failures.
-- Claiming `/verify` or CI passed without running `./scripts/check.sh` and llvm-cov.
+- Relaxing Clippy thresholds, the llvm-cov 100% line gate, or the CRAP
+  `--threshold strict` gate solely to hide failures.
+- Claiming `/verify` or CI passed without running `./scripts/check.sh`, llvm-cov,
+  and `./scripts/crap-gate.sh`.
 
 ## Workflow
 
@@ -112,7 +114,7 @@ Read the matching skill **before** editing that area. Load only what the task ne
 | If you are changing… | Read first |
 | -------------------- | ---------- |
 | Parsers, analyses, grain, CLI, help, or README UX | [`hotspots-domain`](.agents/skills/hotspots-domain/) |
-| Local verify gates (`check.sh`, llvm-cov) | [`verify-gates`](.agents/skills/verify-gates/) |
+| Local verify gates (`check.sh`, llvm-cov, CRAP) | [`verify-gates`](.agents/skills/verify-gates/) |
 | Rust style, docs, naming, API conventions | [`rust-style-guide`](.agents/skills/rust-style-guide/) |
 | Traits, modules, dependency direction | [`rust-solid-design`](.agents/skills/rust-solid-design/) |
 
@@ -154,7 +156,7 @@ task-specific guidance and should not be loaded unless relevant.
 
 - [`.agents/skills/rust-style-guide/`](.agents/skills/rust-style-guide/) — formatting, docs, naming, API conventions
 - [`.agents/skills/rust-solid-design/`](.agents/skills/rust-solid-design/) — SOLID in Rust: traits, modules, DI
-- [`.agents/skills/verify-gates/`](.agents/skills/verify-gates/) — `check.sh` then llvm-cov 100%
+- [`.agents/skills/verify-gates/`](.agents/skills/verify-gates/) — `check.sh`, llvm-cov 100%, CRAP strict
 - [`.agents/skills/hotspots-domain/`](.agents/skills/hotspots-domain/) — log formats, grain, analyses, crate map
 
 ## Commands
@@ -164,7 +166,7 @@ The directory is symlinked from [`.cursor/commands`](.cursor/commands).
 
 Prefer repository commands over manually recreating equivalent workflows.
 
-- `/verify` — `./scripts/check.sh` then llvm-cov `--fail-under-lines 100`
+- `/verify` — `./scripts/check.sh`, llvm-cov `--fail-under-lines 100`, then CRAP strict
 - `/design-scan` — style + SOLID checklist with must-fix / nice-to-have / keep-as-is
 
 ## Hooks
@@ -191,7 +193,7 @@ A change is complete when:
 | Touched area | Minimum verification |
 | ------------ | -------------------- |
 | Any `.rs` / workspace code | `./scripts/check.sh` (or the equivalent failing step while iterating) |
-| Merge-ready / `/verify` claim | `./scripts/check.sh` **and** llvm-cov `--fail-under-lines 100` |
+| Merge-ready / `/verify` claim | `./scripts/check.sh`, llvm-cov `--fail-under-lines 100`, **and** `./scripts/crap-gate.sh` |
 
 - Do not claim a check passed unless it was actually run and passed.
 - If verification cannot be completed, clearly state what was not run and why.

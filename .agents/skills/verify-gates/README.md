@@ -1,6 +1,6 @@
 # Verify gates (Skill)
 
-Agent skill for hotspots local quality gates (check.sh → llvm-cov).
+Agent skill for hotspots local quality gates (check.sh → llvm-cov → CRAP).
 
 ## When to use
 

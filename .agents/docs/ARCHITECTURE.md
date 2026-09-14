@@ -36,7 +36,7 @@ hotspots internals.
 - Install steps, CLI flags, and usage examples — see [README.md](../../README.md)
 - Domain playbook (log formats, analyses, grain UX) — see
   [hotspots-domain](../skills/hotspots-domain/SKILL.md)
-- Full local gates (check.sh, llvm-cov) — see
+- Full local gates (check.sh, llvm-cov, CRAP) — see
   [verify-gates](../skills/verify-gates/SKILL.md) and [AGENTS.md](../../AGENTS.md)
 - Formatting and SOLID conventions — see
   [rust-style-guide](../skills/rust-style-guide/SKILL.md) and
@@ -268,8 +268,9 @@ Run the workspace pipeline:
 ./scripts/check.sh
 ```
 
-Full local `/verify` also runs llvm-cov (`--fail-under-lines 100`). CI enforces
-the same coverage gate in
+Full local `/verify` also runs llvm-cov (`--fail-under-lines 100`) and
+`./scripts/crap-gate.sh` (`--threshold strict`). CI enforces the same coverage
+and CRAP gates in
 [`.github/workflows/coverage.yml`](../../.github/workflows/coverage.yml).
 Detail: [verify-gates](../skills/verify-gates/SKILL.md), or run `/verify`.
 

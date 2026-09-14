@@ -10,3 +10,5 @@ cd "$root"
 cargo llvm-cov --workspace --all-features \
   --lcov --output-path lcov.info \
   --fail-under-lines 100
+
+./scripts/crap-gate.sh

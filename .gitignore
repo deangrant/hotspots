@@ -9,6 +9,7 @@ rustc-ice-*.txt
 .bacon-locations
 .bacon.socket
 /.codegraph/
+.tools/
 coverage/
 *.profraw
 *.profdata

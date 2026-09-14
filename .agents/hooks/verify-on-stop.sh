@@ -50,7 +50,7 @@ if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/n
     path=${line:3}
     path=${path##* -> }
     case "${path}" in
-      *.rs|Cargo.toml|Cargo.lock|clippy.toml|deny.toml|rustfmt.toml|scripts/check.sh)
+      *.rs|Cargo.toml|Cargo.lock|clippy.toml|deny.toml|rustfmt.toml|scripts/check.sh|scripts/crap-gate.sh|scripts/crap-score.rev)
         relevant=1
         break
         ;;
@@ -89,7 +89,7 @@ if command -v python3 >/dev/null 2>&1; then
 import json, os
 log = os.environ.get("VERIFY_LOG", "")
 msg = (
-    "Local verify failed (./scripts/check.sh, llvm-cov). "
+    "Local verify failed (./scripts/check.sh, llvm-cov, crap-gate). "
     "Fix the failures, re-run /verify, then stop.\n\n"
     + log
 )
