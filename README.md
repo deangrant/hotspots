@@ -183,7 +183,7 @@ a sample table and column guide.
 | `coupling` | Entity pairs ranked by shared-changeset coupling degree |
 | `soc` | Sum-of-coupling score per entity |
 | `entity-ownership` | Added and deleted lines per entity and author |
-| `main-dev` | Main developer by added lines per entity |
+| `main-dev` | Main developer by added lines per entity (ownership = share of additions; omits entities with no additions; use `main-dev-by-revs` for delete-only) |
 | `entity-effort` | Author revisions versus total revisions per entity |
 | `main-dev-by-revs` | Main developer by revision count per entity |
 | `fragmentation` | Ownership fragmentation (`1 - sum(share²)`) |
@@ -210,7 +210,7 @@ missing.
 | `-s`, `--max-changeset-size N` | Max changeset size for coupling | `30` (max `200`) |
 | `-d`, `--age-time-now YYYY-MM-DD` | Reference date for `age` | unset |
 | `-t`, `--temporal-period day` | Merge same-day commits per author for coupling, SOC, and risk’s revision-based inputs (revs, SOC, fragmentation); churn stays total lines | off |
-| `-g`, `--group FILE` | Layer map (`prefix => layer` lines) | unset |
+| `-g`, `--group FILE` | Layer map (`prefix => layer` lines; first match in file order wins — put specific prefixes first; unmatched paths keep their names) | unset |
 | `--exclude PREFIX` | Drop matching paths (repeatable) | none |
 | `--include PREFIX` | Keep only matching nonempty path prefixes (repeatable) | none |
 | `--format text\|json` | Output format | `text` |

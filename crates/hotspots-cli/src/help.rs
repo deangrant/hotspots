@@ -25,7 +25,7 @@ Options:
   -s, --max-changeset-size N     Max changeset size for coupling (default: 30, max: 200)
   -d, --age-time-now YYYY-MM-DD  Reference date for age analysis
   -t, --temporal-period day      Merge same-day commits per author (coupling, SOC, risk)
-  -g, --group FILE               Layer map (`prefix => layer` lines)
+  -g, --group FILE               Layer map (`prefix => layer`; first match wins)
       --exclude PREFIX           Drop matching paths (repeatable)
       --include PREFIX           Keep only matching nonempty path prefixes (repeatable)
       --format text|json         Output format (default: text)
@@ -39,6 +39,11 @@ Function grain expands `*.rs` changes to `path::symbol` via git + syn using
 `--repo`. Non-Rust paths are dropped. Revisions in the log must exist in
 `--repo`. Accuracy uses per-commit symbol tables and zero-context hunk overlap
 (not HEAD-only maps). Restrict with `--include` when the log mixes languages.
+
+Layer maps try rules in file order (first match wins; put specific prefixes
+first). Unmatched paths keep their names. `main-dev` ownership is share of
+added lines and omits entities with no additions (`main-dev-by-revs` for
+delete-only).
 
 Analyses:
   {analyses}

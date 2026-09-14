@@ -1,4 +1,7 @@
 //! Line-based ownership and main-developer metrics.
+//!
+//! `main-dev` ranks by added lines and reports ownership as share of additions.
+//! Entities with no additions are omitted; use `main-dev-by-revs` for delete-only.
 
 use std::collections::BTreeMap;
 
@@ -57,6 +60,9 @@ fn main_dev_row(
         return None;
     }
     let total_added: u64 = authors.values().map(|(a, _)| *a).sum();
+    if total_added == 0 {
+        return None;
+    }
     let (author, added) = leading_author_by_added(authors)?;
     Some((entity, author, added, percent(added, total_added)))
 }
@@ -128,10 +134,29 @@ mod tests {
             min_revs: 2,
             ..Options::default()
         };
-        let table = entity_ownership(&changes, &opts).unwrap_or_default();
-        assert!(table.rows.iter().all(|row| row[0] == "a.rs"));
-        let mains = main_dev(&changes, &opts).unwrap_or_default();
-        assert_eq!(mains.rows.len(), 1);
-        assert_eq!(mains.rows[0][0], "a.rs");
+        let table = entity_ownership(&changes, &opts);
+        assert!(table.is_ok_and(|t| t.rows.iter().all(|row| row[0] == "a.rs")));
+        let mains = main_dev(&changes, &opts);
+        assert!(mains.is_ok_and(|t| t.rows.len() == 1 && t.rows[0][0] == "a.rs"));
+    }
+
+    #[test]
+    fn main_dev_omits_delete_only_and_ranks_by_added() {
+        let changes = [
+            Change::new("1", "Ada", "2024-01-01", "gone.rs", Some(0), Some(10)),
+            Change::new("2", "Bea", "2024-01-01", "mixed.rs", Some(1), Some(50)),
+            Change::new("3", "Ada", "2024-01-02", "mixed.rs", Some(5), Some(0)),
+        ];
+        let opts = Options {
+            min_revs: 1,
+            ..Options::default()
+        };
+        let mains = main_dev(&changes, &opts);
+        assert!(mains.is_ok_and(|t| {
+            t.rows.len() == 1
+                && t.rows[0][0] == "mixed.rs"
+                && t.rows[0][1] == "Ada"
+                && t.rows[0][2] == "5"
+        }));
     }
 }

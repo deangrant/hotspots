@@ -82,8 +82,7 @@ fn identity_and_hotspots_variants() {
     let no_churn = vec![change("1", "Ada", "2024-01-01", "a.rs", None, None)];
     assert!(analysis::run("hotspots", &no_churn, &o).is_ok());
     let identity = analysis::run("identity", &no_churn, &o);
-    assert!(identity.is_ok());
-    assert_eq!(identity.unwrap_or_default().rows[0][4], "-");
+    assert!(identity.is_ok_and(|t| t.rows[0][4] == "-"));
 }
 
 #[test]
@@ -122,8 +121,7 @@ fn parse_errors_and_empty() {
     let orphan = GitNumstatParser.parse(&mut Cursor::new(b"1\t0\ta.rs\n"));
     assert!(orphan.is_err());
     let empty = GitNumstatParser.parse(&mut Cursor::new(b""));
-    assert!(empty.is_ok());
-    assert!(empty.unwrap_or_default().is_empty());
+    assert!(empty.is_ok_and(|v| v.is_empty()));
     let blank = GitNumstatParser.parse(&mut Cursor::new(b"\n\n"));
     assert!(blank.is_ok());
     assert!(GitNumstatParser.parse(&mut Cursor::new("--\n1\t0\ta.rs")).is_err());
@@ -162,8 +160,10 @@ fn pipeline_with_and_without_group() {
         std::env::temp_dir().join(format!("hotspots-pipe-group-{}.txt", std::process::id()));
     assert!(std::fs::write(&group, "src => app\n").is_ok());
     o.group_file = Some(group.to_string_lossy().into_owned());
-    o.analysis = String::from("summary");
-    assert!(analyze_log(&mut Cursor::new(log.as_bytes()), "git2", &o).is_ok());
+    o.analysis = String::from("revisions");
+    o.min_revs = 1;
+    let table = analyze_log(&mut Cursor::new(log.as_bytes()), "git2", &o);
+    assert!(table.is_ok_and(|t| t.rows.iter().any(|row| row[0] == "app")));
     let _ = std::fs::remove_file(group);
 }
 
@@ -186,8 +186,8 @@ fn min_revs_filters_age_and_authors() {
     let mut o = opts();
     o.min_revs = 100;
     assert!(analysis::run("age", &changes, &o).is_ok());
-    assert!(analysis::run("authors", &changes, &o).unwrap_or_default().rows.is_empty());
-    assert!(analysis::run("entity-churn", &changes, &o).unwrap_or_default().rows.is_empty());
+    assert!(analysis::run("authors", &changes, &o).is_ok_and(|t| t.rows.is_empty()));
+    assert!(analysis::run("entity-churn", &changes, &o).is_ok_and(|t| t.rows.is_empty()));
 }
 
 #[test]
@@ -195,14 +195,9 @@ fn min_revs_filters_effort_metrics() {
     let changes = sample_changes();
     let mut o = opts();
     o.min_revs = 100;
-    assert!(analysis::run("entity-effort", &changes, &o).unwrap_or_default().rows.is_empty());
-    assert!(
-        analysis::run("main-dev-by-revs", &changes, &o)
-            .unwrap_or_default()
-            .rows
-            .is_empty()
-    );
-    assert!(analysis::run("fragmentation", &changes, &o).unwrap_or_default().rows.is_empty());
+    assert!(analysis::run("entity-effort", &changes, &o).is_ok_and(|t| t.rows.is_empty()));
+    assert!(analysis::run("main-dev-by-revs", &changes, &o).is_ok_and(|t| t.rows.is_empty()));
+    assert!(analysis::run("fragmentation", &changes, &o).is_ok_and(|t| t.rows.is_empty()));
 }
 
 #[test]
@@ -210,10 +205,10 @@ fn coupling_shared_rev_gate_and_soc_skip() {
     let changes = sample_changes();
     let mut o = opts();
     o.min_shared_revs = 100;
-    assert!(analysis::run("coupling", &changes, &o).unwrap_or_default().rows.is_empty());
+    assert!(analysis::run("coupling", &changes, &o).is_ok_and(|t| t.rows.is_empty()));
     o.min_shared_revs = 1;
     o.max_changeset_size = 0;
-    assert!(analysis::run("soc", &changes, &o).unwrap_or_default().rows.is_empty());
+    assert!(analysis::run("soc", &changes, &o).is_ok_and(|t| t.rows.is_empty()));
 }
 
 #[test]

@@ -113,9 +113,9 @@ mod tests {
             rows: Some(2),
             ..Options::default()
         };
-        let table = abs_churn(&changes, &opts).unwrap_or_default();
-        assert_eq!(table.rows.len(), 2);
-        assert_eq!(table.rows[0][0], "2024-01-03");
-        assert_eq!(table.rows[1][0], "2024-01-02");
+        let table = abs_churn(&changes, &opts);
+        assert!(table.as_ref().is_ok_and(|t| t.rows.len() == 2));
+        assert!(table.as_ref().is_ok_and(|t| t.rows[0][0] == "2024-01-03"));
+        assert!(table.is_ok_and(|t| t.rows[1][0] == "2024-01-02"));
     }
 }

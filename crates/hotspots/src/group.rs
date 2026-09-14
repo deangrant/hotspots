@@ -1,4 +1,8 @@
 //! Optional architectural layer mapping for entities.
+//!
+//! Rules are tried in file order; the first matching prefix wins. Put longer
+//! or more specific prefixes before broader ones. Paths that match no rule keep
+//! their original entity name, so layers and files can appear in one analysis.
 
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -16,6 +20,9 @@ pub struct LayerMap {
 impl LayerMap {
     /// Loads rules from a text file of `prefix => layer` lines.
     ///
+    /// Matching uses file order: the first matching prefix wins. Unmatched
+    /// paths are left unchanged when [`Self::apply`] runs.
+    ///
     /// # Errors
     ///
     /// Returns an error when the file cannot be read or a line is malformed.
@@ -32,6 +39,9 @@ impl LayerMap {
     }
 
     /// Rewrites each change entity to its layer when a prefix matches.
+    ///
+    /// First matching rule in load order wins. Entities with no match are
+    /// unchanged.
     #[must_use]
     pub fn apply(&self, mut changes: Vec<Change>) -> Vec<Change> {
         for change in &mut changes {
@@ -123,17 +133,17 @@ mod tests {
     fn load_accepts_comments_and_blank_lines() {
         let path = temp_rules("# comment\n\nsrc/ => app\n");
         let loaded = LayerMap::load(&path);
-        assert!(loaded.is_ok(), "{:?}", loaded.err());
-        let map = loaded.unwrap_or_default();
-        let changes = map.apply(vec![Change::new(
-            "1",
-            "Ada",
-            "2024-01-01",
-            "src/x.rs",
-            None,
-            None,
-        )]);
-        assert_eq!(changes[0].entity, "app");
+        assert!(loaded.is_ok_and(|map| {
+            let changes = map.apply(vec![Change::new(
+                "1",
+                "Ada",
+                "2024-01-01",
+                "src/x.rs",
+                None,
+                None,
+            )]);
+            changes[0].entity == "app"
+        }));
         let _ = std::fs::remove_file(path);
     }
 
@@ -162,6 +172,23 @@ mod tests {
             None,
         )]);
         assert_eq!(changes[0].entity, "docs/a.md");
+    }
+
+    #[test]
+    fn first_matching_rule_wins_over_later_specific_prefix() {
+        let map = LayerMap::from_rules(vec![
+            (String::from("src"), String::from("A")),
+            (String::from("src/api"), String::from("B")),
+        ]);
+        let changes = map.apply(vec![Change::new(
+            "1",
+            "Ada",
+            "2024-01-01",
+            "src/api/x.rs",
+            None,
+            None,
+        )]);
+        assert_eq!(changes[0].entity, "A");
     }
 
     fn temp_rules(contents: &str) -> PathBuf {
