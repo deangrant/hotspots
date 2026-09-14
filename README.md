@@ -146,7 +146,8 @@ are **dropped** (stderr reports the count). syn attributes free functions,
 `impl` methods, and trait methods only — not macros, `const`, types, statics,
 or other items — so edits that only touch those may miss all symbols and drop
 with a stderr count. Changes with no line hunks (for example mode-only diffs)
-are also dropped with a stderr count.
+are also dropped with a stderr count. Those stderr notes do **not** change the
+exit code: a completed analysis still exits **0**.
 
 Failures (missing `--repo`, git errors, unparsable `.rs`, or a blob/patch over
 the 16 MiB git stdout cap) **abort** the run. There is no silent fallback to
@@ -198,6 +199,10 @@ Several ranking analyses respect `-n` / `--min-revs` (default **5**). Coupling
 analyses also use `-m`, `-i`, `-x`, and `-s` (see below). Some churn and
 ownership analyses need numstat line counts and fail if those fields are
 missing.
+
+Author identity is the exact `%aN` string from the log. Day-merge (`-t day`),
+ownership, and related author metrics do **not** merge spelling or email
+variants (`Ada` and `ada` stay distinct).
 
 ## Common options
 
@@ -274,7 +279,7 @@ cargo run -p hotspots-cli -- -l logfile.log -c git2 -a summary
 
 | Code | Meaning |
 | ---- | ------- |
-| `0` | Success (including `--help`) |
+| `0` | Success (including `--help`, and runs that printed function-grain drop notes) |
 | `1` | Usage, I/O, parse, git, or analysis failure |
 
 On failure the CLI prints `error: …` to stderr. Common cases:
