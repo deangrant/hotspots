@@ -37,4 +37,5 @@ fi
 
 cargo run --manifest-path "${dry_dir}/Cargo.toml" -p dry-rs --locked -- \
     . \
+    --exclude target,.git,fixtures,tests,.tools \
     --fail-on-findings

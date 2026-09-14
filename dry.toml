@@ -1,0 +1,6 @@
+[gate]
+threshold = 0.85
+fail_on_findings = true
+
+[walk]
+exclude = ["target", ".git", "fixtures", "tests", ".tools"]

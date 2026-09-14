@@ -33,7 +33,9 @@ from the failed step (or the top).
    Resolves the tool tree from `DRY_SCORE_DIR`, else sibling `../dry-score`,
    else a shallow clone of the pin in
    [`scripts/dry-score.rev`](../../../scripts/dry-score.rev) under `.tools/`.
-   Fails when any finding is reported (`--fail-on-findings`).
+   Walk excludes `.tools` (plus the dry-rs defaults) so a CI pin checkout under
+   `.tools/dry-score` is not analyzed. Fails when any finding is reported
+   (`--fail-on-findings`). Config: [`dry.toml`](../../../dry.toml).
 
 3. Line coverage LCOV (needs `cargo-llvm-cov` and `llvm-tools-preview`):
 
