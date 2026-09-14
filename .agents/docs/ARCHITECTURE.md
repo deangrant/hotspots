@@ -51,13 +51,13 @@ pipeline, and writes a text or JSON table to stdout.
 
 **Ownership:**
 
-- `hotspots-cli` owns argv, process I/O, help text, and wiring
-  [`RustGitSynResolver`](../../crates/hotspots-rs/src/resolve.rs) when
+- `hotspots-cli` owns argv, process I/O, help text, and wiring of
+  [`RustGitSynResolver`](../../crates/hotspots-rs/src/resolve/mod.rs) when
   `--grain function`.
 - `hotspots` owns parsing, filtering, grain orchestration, analyses, and
   table writers. The library stays std-oriented and does **not** shell out to
   `git`.
-- `hotspots-rs` owns the `SymbolResolver` implementation (git CLI + `syn`).
+- `hotspots-rs` owns the `SymbolResolver` implementation (`git` CLI + `syn`).
 
 **Runtime bar:**
 
@@ -222,7 +222,7 @@ flowchart TB
 | Area | Path | Role |
 | ---- | ---- | ---- |
 | Entry | [`main.rs`](../../crates/hotspots-cli/src/main.rs) | Open log, run pipeline, write stdout, exit codes |
-| Args | [`args.rs`](../../crates/hotspots-cli/src/args.rs) | Flag parsing into `Options` |
+| Args | [`args/`](../../crates/hotspots-cli/src/args/mod.rs) | Flag parsing into `Options` (`flags`, `validate`) |
 | Help | [`help.rs`](../../crates/hotspots-cli/src/help.rs) | `-h/--help` text |
 
 ## Hard invariants
@@ -244,12 +244,12 @@ flowchart TB
 
 | Code | Meaning | What to do |
 | ---- | ------- | ---------- |
-| `0` | Success (including `--help`) | Nothing required |
+| `0` | Success (including `--help`, and runs that printed function-grain drop notes) | Nothing required |
 | `1` | Usage, I/O, parse, git, or analysis failure | Read the `error:` line on stderr; fix flags, log, or repo |
 
 The CLI maps every `Err` to [`ExitCode::FAILURE`](../../crates/hotspots-cli/src/main.rs).
 There is no separate “findings present” exit code—analyses always emit a table
-on success.
+on success. Function-grain stderr drop notes do **not** change the exit code.
 
 ## Trust boundary
 

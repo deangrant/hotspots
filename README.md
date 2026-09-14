@@ -49,14 +49,14 @@ A default run (no `-a`, no `--format`) prints an aligned **text** table for the
 The header uses uppercase column names. The entity column is left-aligned;
 numeric columns are right-aligned. Columns are `entity`, `risk`, `revs`,
 `churn`, `soc`, and `fragmentation`. The `risk` and `fragmentation` values use
-two fraction digits; the other metrics are integers.
+two fraction digits on a **0–100** display scale; the other metrics are integers.
 
 Illustrative sample (numbers are made up and only comparable within one log):
 
 ```text
   ENTITY             RISK  REVS  CHURN  SOC  FRAGMENTATION
-  src/lib.rs         87.50    12    340   48           0.42
-  src/cli/args.rs    61.25     7    120   21           0.18
+  src/lib.rs         87.50    12    340   48          42.00
+  src/cli/args.rs    61.25     7    120   21          18.00
 
 2 rows.
 ```
@@ -68,7 +68,7 @@ Illustrative sample (numbers are made up and only comparable within one log):
 | `revs` | Distinct revisions that touched the entity |
 | `churn` | Total added + deleted lines when the log has numstat |
 | `soc` | Sum-of-coupling score for the entity |
-| `fragmentation` | Ownership fragmentation indicator for the entity |
+| `fragmentation` | Ownership fragmentation on a **0–100** display scale (`1 - sum(share²)` × 100) |
 
 Treat every column as an investigation signal, not as blame or defect
 probability. Use `--format json` when you need the same fields as a JSON array
@@ -305,7 +305,7 @@ On failure the CLI prints `error: …` to stderr. Common cases:
 Contributor layout, invariants, and verification live in
 [ARCHITECTURE.md](.agents/docs/ARCHITECTURE.md) and [AGENTS.md](AGENTS.md).
 An indexed project wiki is available on
-[DeepWiki](https://deepwiki.com/deangrant/hotpsots).
+[DeepWiki](https://deepwiki.com/deangrant/hotspots).
 
 ## License
 
