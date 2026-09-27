@@ -12,7 +12,7 @@ categories = ["development-tools"]
 [dependencies]
 hotspots = { path = "../hotspots", version = "0.1.0" }
 proc-macro2 = { version = "1", default-features = false, features = ["span-locations"] }
-syn = { version = "2", default-features = false, features = ["full", "parsing", "printing", "clone-impls", "extra-traits"] }
+syn = { version = "3", default-features = false, features = ["full", "parsing", "printing", "clone-impls", "extra-traits"] }
 
 [lints]
 workspace = true
