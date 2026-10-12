@@ -38,6 +38,7 @@ fn parses_required_fields() {
 
 #[test]
 fn parses_optional_numeric_flags() {
+    // dry-rs:ignore. Parallel optional-flag parse fixtures; structural twins are intentional.
     let parsed = parse_args(&argv(&[
         "-l", "log.txt", "-c", "git2", "-r", "10", "-m", "2", "-i", "20", "-x", "80", "-s", "15",
     ]));
@@ -52,6 +53,7 @@ fn parses_optional_numeric_flags() {
 
 #[test]
 fn parses_optional_path_flags() {
+    // dry-rs:ignore. Parallel optional-flag parse fixtures; structural twins are intentional.
     let parsed = parse_args(&argv(&[
         "-l",
         "log.txt",

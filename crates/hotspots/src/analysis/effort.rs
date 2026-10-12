@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::analysis::table::Table;
 use crate::analysis::util::{
-    cmp_f64_desc, count_as_u64, fmt_pct, fmt_u64, meets_min_revs, percent,
+    cmp_f64_desc, count_as_u64, fmt_pct, fmt_u64, leading_by_metric, meets_min_revs, percent,
 };
 use crate::index::logical_rev;
 use crate::model::Change;
@@ -139,10 +139,7 @@ fn collect_logical_revs(changes: &[Change], period: TemporalPeriod) -> EntityAut
 }
 
 fn leading_author_by_revs(authors: BTreeMap<String, BTreeSet<String>>) -> Option<(String, u64)> {
-    authors
-        .into_iter()
-        .map(|(author, revs)| (author, count_as_u64(revs.len())))
-        .max_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(&b.0)))
+    leading_by_metric(authors.into_iter().map(|(author, revs)| (author, count_as_u64(revs.len()))))
 }
 
 #[cfg(test)]

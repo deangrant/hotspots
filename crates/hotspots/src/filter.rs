@@ -55,8 +55,10 @@ impl PathFilter {
 ///
 /// Returns an error when any prefix is empty after trim and trailing-`/` strip.
 pub fn ensure_include_prefixes(include: &[String]) -> Result<()> {
-    if include.iter().any(|raw| normalize_prefix(raw).is_empty()) {
-        return Err(Error::msg("`--include` prefix must be non-empty"));
+    for raw in include {
+        if normalize_prefix(raw).is_empty() {
+            return Err(Error::msg("`--include` prefix must be non-empty"));
+        }
     }
     Ok(())
 }

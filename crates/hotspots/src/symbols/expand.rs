@@ -123,10 +123,18 @@ fn add_overlap_counts(
 }
 
 fn covering_symbol(symbols: &[SymbolFact], line: u32) -> Option<&SymbolFact> {
-    symbols
-        .iter()
-        .filter(|s| s.start_line <= line && line <= s.end_line)
-        .min_by_key(|s| s.end_line.saturating_sub(s.start_line))
+    let mut best: Option<&SymbolFact> = None;
+    for symbol in symbols {
+        if symbol.start_line > line || line > symbol.end_line {
+            continue;
+        }
+        let span = symbol.end_line.saturating_sub(symbol.start_line);
+        match best {
+            Some(current) if current.end_line.saturating_sub(current.start_line) <= span => {}
+            _ => best = Some(symbol),
+        }
+    }
+    best
 }
 
 #[cfg(test)]
@@ -161,6 +169,28 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].entity, "a.rs::foo");
         assert_eq!(rows[0].added, Some(2));
+    }
+
+    #[test]
+    fn prefers_tightest_covering_symbol_when_nested() {
+        // dry-rs:ignore. Parallel expand_file_change fixture; structural twin is intentional.
+        let change = Change::new("abc", "Ada", "2024-01-01", "a.rs", Some(1), Some(0));
+        let diff = FileDiff {
+            rev: String::from("abc"),
+            path: String::from("a.rs"),
+            // Inner first so the later wider span exercises the keep-current branch.
+            symbols_new: vec![fact("inner", 5, 8), fact("outer", 1, 20)],
+            symbols_old: vec![],
+            hunks: vec![Hunk {
+                old_start: 0,
+                old_count: 0,
+                new_start: 6,
+                new_count: 1,
+            }],
+        };
+        let rows = expand_file_change(&change, &diff);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].entity, "a.rs::inner");
     }
 
     #[test]

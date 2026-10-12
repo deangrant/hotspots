@@ -69,7 +69,12 @@ pub fn run(name: &str, changes: &[Change], opts: &Options) -> Result<Table> {
 }
 
 fn lookup<T: Copy>(table: &[(&str, T)], name: &str) -> Option<T> {
-    table.iter().find(|(key, _)| *key == name).map(|(_, f)| *f)
+    for &(key, value) in table {
+        if key == name {
+            return Some(value);
+        }
+    }
+    None
 }
 
 /// Names of analyses accepted by [`run`].

@@ -49,11 +49,13 @@ impl<G: GitRunner> SymbolResolver for RustGitSynResolver<G> {
 }
 
 fn rust_keys(changes: &[Change]) -> BTreeSet<(String, String)> {
-    changes
-        .iter()
-        .filter(|c| is_rust_path(&c.entity))
-        .map(|c| (c.rev.clone(), c.entity.clone()))
-        .collect()
+    let mut keys = BTreeSet::new();
+    for change in changes {
+        if is_rust_path(&change.entity) {
+            keys.insert((change.rev.clone(), change.entity.clone()));
+        }
+    }
+    keys
 }
 
 fn git_job_count(key_count: usize) -> usize {
