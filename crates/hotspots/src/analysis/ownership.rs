@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use crate::analysis::table::Table;
 use crate::analysis::util::{
-    entity_revisions, fmt_pct, fmt_u64, meets_min_revs, percent, require_churn,
+    entity_revisions, fmt_pct, fmt_u64, leading_by_metric, meets_min_revs, percent, require_churn,
 };
 use crate::error::Result;
 use crate::model::Change;
@@ -90,10 +90,7 @@ fn collect_churn(changes: &[Change]) -> EntityAuthorChurn {
 }
 
 fn leading_author_by_added(authors: BTreeMap<String, (u64, u64)>) -> Option<(String, u64)> {
-    authors
-        .into_iter()
-        .map(|(author, (added, _))| (author, added))
-        .max_by(|a, b| a.1.cmp(&b.1).then(a.0.cmp(&b.0)))
+    leading_by_metric(authors.into_iter().map(|(author, (added, _))| (author, added)))
 }
 
 fn flatten_churn(map: EntityAuthorChurn) -> Vec<(String, String, u64, u64)> {

@@ -43,12 +43,24 @@ pub fn entity_authors(changes: &[Change]) -> BTreeMap<String, BTreeSet<String>> 
 ///
 /// Returns an error when any row lacks numstat data.
 pub fn require_churn(changes: &[Change]) -> Result<()> {
-    if changes.iter().any(|c| c.added.is_none() || c.deleted.is_none()) {
-        return Err(Error::msg(
-            "analysis requires numstat line counts; use `-c git2` or a numstat log",
-        ));
+    for change in changes {
+        if change.added.is_none() || change.deleted.is_none() {
+            return Err(Error::msg(
+                "analysis requires numstat line counts; use `-c git2` or a numstat log",
+            ));
+        }
     }
     Ok(())
+}
+
+/// Picks the author with the highest metric, breaking ties by author name.
+#[must_use]
+pub fn leading_by_metric(
+    authors: impl IntoIterator<Item = (String, u64)>,
+) -> Option<(String, u64)> {
+    authors
+        .into_iter()
+        .max_by(|left, right| left.1.cmp(&right.1).then(left.0.cmp(&right.0)))
 }
 
 /// Drops entities below the configured revision threshold.
@@ -160,6 +172,11 @@ mod tests {
         };
         assert!(!meets_min_revs(1, &opts));
         assert!(meets_min_revs(2, &opts));
+        assert!(leading_by_metric(Vec::<(String, u64)>::new()).is_none());
+        assert_eq!(
+            leading_by_metric([(String::from("Bea"), 5), (String::from("Ada"), 5)]),
+            Some((String::from("Bea"), 5))
+        );
     }
 
     #[test]

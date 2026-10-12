@@ -61,10 +61,12 @@ pub(super) fn parse_flag(
 }
 
 fn lookup_flag(flag: &str) -> Option<Flag> {
-    FLAG_NAMES
-        .iter()
-        .find(|(names, _)| names.contains(&flag))
-        .map(|(_, kind)| *kind)
+    for (names, kind) in FLAG_NAMES {
+        if names.contains(&flag) {
+            return Some(*kind);
+        }
+    }
+    None
 }
 
 fn apply_flag(
