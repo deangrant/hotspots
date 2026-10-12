@@ -97,7 +97,7 @@ fn type_path_name(ty: &syn::Type) -> Option<String> {
 }
 
 fn trait_path_name(imp: &syn::ItemImpl) -> Option<String> {
-    let (_, path, _) = imp.trait_.as_ref()?;
+    let (path, _) = imp.trait_.as_ref()?;
     path.segments.last().map(|seg| seg.ident.to_string())
 }
 
