@@ -15,15 +15,20 @@ permissions:
 
 jobs:
   llvm-cov:
-    name: Line coverage 100% and CRAP strict
+    name: Line coverage 100%
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: write
+    outputs:
+      count: ${{ steps.pkgs.outputs.count }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: 1.94.0
           components: llvm-tools-preview
@@ -37,27 +42,10 @@ jobs:
             echo "No workspace packages; skipping coverage."
           fi
 
-      - name: Read crap-score pin
-        id: crap_pin
-        if: steps.pkgs.outputs.count != '0'
-        run: |
-          echo "ref=$(tr -d '[:space:]' <scripts/crap-score.rev)" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout crap-score pin
-        if: steps.pkgs.outputs.count != '0'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: deangrant/crap-score
-          ref: ${{ steps.crap_pin.outputs.ref }}
-          path: .tools/crap-score
-          persist-credentials: false
-
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         if: steps.pkgs.outputs.count != '0'
         with:
-          workspaces: |
-            .
-            .tools/crap-score
+          workspaces: .
 
       - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe
         if: steps.pkgs.outputs.count != '0'
@@ -71,8 +59,38 @@ jobs:
             --lcov --output-path lcov.info \
             --fail-under-lines 100
 
-      - name: CRAP gate (strict / 8)
+      - name: Upload lcov.info
         if: steps.pkgs.outputs.count != '0'
-        env:
-          CRAP_SCORE_DIR: ${{ github.workspace }}/.tools/crap-score
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lcov-info
+          path: lcov.info
+          if-no-files-found: error
+          retention-days: 1
+
+  crap-gate:
+    name: CRAP gate (strict / 8)
+    needs: llvm-cov
+    if: needs.llvm-cov.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: 1.94.0
+
+      - name: Download lcov.info
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: lcov-info
+          path: .
+
+      - name: CRAP gate (strict / 8)
         run: ./scripts/crap-gate.sh

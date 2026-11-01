@@ -60,7 +60,12 @@ from the failed step (or the top).
 
 CI enforces dry via [`.github/workflows/dry.yml`](../../../.github/workflows/dry.yml)
 and coverage/CRAP via
-[`.github/workflows/coverage.yml`](../../../.github/workflows/coverage.yml).
+[`.github/workflows/coverage.yml`](../../../.github/workflows/coverage.yml)
+(llvm-cov may write rust-cache; CRAP is a separate uncached job that consumes
+the `lcov.info` artifact). Workflows do not `actions/checkout` tool pins;
+[`dry-gate.sh`](../../../scripts/dry-gate.sh) /
+[`crap-gate.sh`](../../../scripts/crap-gate.sh) clone the SHA from
+`scripts/*.rev` themselves.
 
 ## Tool pins and dry-rs suppressions
 
