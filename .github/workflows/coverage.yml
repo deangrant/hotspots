@@ -12,13 +12,15 @@ concurrency:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   llvm-cov:
     name: Line coverage 100%
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: write
     outputs:
       count: ${{ steps.pkgs.outputs.count }}
     steps:
@@ -26,7 +28,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: 1.94.0
           components: llvm-tools-preview
@@ -80,7 +82,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: 1.94.0
 
