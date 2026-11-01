@@ -86,19 +86,6 @@ jobs:
         with:
           toolchain: 1.94.0
 
-      - name: Read crap-score pin
-        id: crap_pin
-        run: |
-          echo "ref=$(tr -d '[:space:]' <scripts/crap-score.rev)" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout crap-score pin
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          repository: deangrant/crap-score
-          ref: ${{ steps.crap_pin.outputs.ref }}
-          path: .tools/crap-score
-          persist-credentials: false
-
       - name: Download lcov.info
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -106,6 +93,4 @@ jobs:
           path: .
 
       - name: CRAP gate (strict / 8)
-        env:
-          CRAP_SCORE_DIR: ${{ github.workspace }}/.tools/crap-score
         run: ./scripts/crap-gate.sh
