@@ -59,8 +59,10 @@ from the failed step (or the top).
    Fails when any function score is strictly above `--threshold strict` (8).
 
 CI enforces dry via [`.github/workflows/dry.yml`](../../../.github/workflows/dry.yml)
-and coverage/CRAP via
-[`.github/workflows/coverage.yml`](../../../.github/workflows/coverage.yml).
+(rust-cache restore-only while running the dry-score pin) and coverage/CRAP via
+[`.github/workflows/coverage.yml`](../../../.github/workflows/coverage.yml)
+(llvm-cov job may write rust-cache; CRAP runs in a separate uncached job that
+consumes the `lcov.info` artifact).
 
 ## Tool pins and dry-rs suppressions
 

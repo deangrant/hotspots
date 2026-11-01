@@ -54,9 +54,9 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         if: steps.pkgs.outputs.count != '0'
         with:
-          workspaces: |
-            .
-            .tools/dry-score
+          # Restore-only: this job executes the third-party dry-score pin.
+          save-if: false
+          workspaces: .tools/dry-score
 
       - name: dry-rs gate (fail on findings)
         if: steps.pkgs.outputs.count != '0'
